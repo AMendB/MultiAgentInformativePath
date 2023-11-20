@@ -1,0 +1,9 @@
+/runs
+*.pyc
+*.pth
+*.DS_Store
+__pycache__/
+*.py[cod]
+nohup.out
+DoneTrainings/
+Experiments/Results/
