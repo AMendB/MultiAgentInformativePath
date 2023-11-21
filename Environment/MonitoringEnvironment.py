@@ -335,8 +335,8 @@ class MultiAgentMonitoring:
 			raise NotImplementedError("This Benchmark is not implemented. Choose one that is.")
 
 		# Model maps #
-		self.model_mean_map = None
-		self.model_uncertainty_map = None
+		self.model_mean_map = np.zeros_like(self.scenario_map) 
+		self.model_uncertainty_map = np.zeros_like(self.scenario_map) 
 
 
 		# Init the redundancy mask #
@@ -440,6 +440,7 @@ class MultiAgentMonitoring:
 
 		# Take samples and update model #
 		self.update_model()
+		self.error_with_gt_backup = np.abs(self.ground_truth.read() - self.model_mean_map)
 
 		# Update the photograph/state of the agents #
 		self.capture_states()
@@ -743,29 +744,30 @@ class MultiAgentMonitoring:
 			ponderation_maps = [np.zeros_like(self.scenario_map) for _ in range(self.n_agents)]
 			for i, j in np.argwhere(self.redundancy_mask > 0):
 					# Check if the influence area of every agent is in the pixel. If true, save its id
-					agents_in_pixel = [agent_id for agent_id, agent in enumerate(self.fleet.vehicles) if agent.influence_mask[i,j] == 1]
+					agents_in_pixel = [agent_id for agent_id, agent in enumerate(self.fleet.vehicles) if agent.influence_mask[i,j] == 1 and self.active_agents[agent_id]]
 					stds_in_pixel = [1 / self.std_sensormeasure[agent_id] if agent_id in agents_in_pixel else 0 for agent_id in range(self.n_agents)]
 					ponderations = stds_in_pixel/(np.sum(stds_in_pixel))
 					for agent_id, ponderation in enumerate(ponderations):
 						ponderation_maps[agent_id][i,j] = ponderation
 					
-
-
 			error_with_gt = np.abs(self.ground_truth.read() - self.model_mean_map)
+			error_improve = self.error_with_gt_backup - error_with_gt
+			self.error_with_gt_backup = error_with_gt.copy()
 
-			errors_in_influence_area = np.array(
+			# Inverse error to obtain higher reward when error is lower
+			ponderated_improvement = np.array(
 				[np.sum(
-					error_with_gt[agent.influence_mask.astype(bool)]  / self.redundancy_mask[agent.influence_mask.astype(bool)]
+					error_improve[agent.influence_mask.astype(bool)]  * ponderation_maps[idx][agent.influence_mask.astype(bool)]
 					) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
 					]
 				)
 			
-			rewards = self.reward_weights[0] * errors_in_influence_area
+			rewards = self.reward_weights[0] * ponderated_improvement 
 
 		cost = {agent_id: 1 if action % 2 == 0 else np.sqrt(2) for agent_id, action in actions.items()} # movements cost (difference between horizontal and diagonal)
 		rewards = {agent_id: rewards[agent_id]/cost[agent_id] if not collisions_mask_dict[agent_id] else -1.0 for agent_id in actions.keys()} # save calculated agent reward/cost, penalization if collision
 
-		return  {agent_id: rewards[agent_id] if self.active_agents[agent_id] else 0 for agent_id in range(self.n_agents)}
+		return {agent_id: rewards[agent_id] if self.active_agents[agent_id] else 0 for agent_id in range(self.n_agents)}
 	
 	
 	def get_active_agents_positions_dict(self):
