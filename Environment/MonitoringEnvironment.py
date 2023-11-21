@@ -723,16 +723,39 @@ class MultiAgentMonitoring:
 			changes_in_model_mean = np.abs(self.model_mean_map - self.previous_model_mean_map)
 			changes_in_model_uncertainty = np.abs(self.model_uncertainty_map - self.previous_model_uncertainty_map)
 
+			# changes_mean = np.array(
+			# 	[np.sum(
+			# 		changes_in_model_mean[agent.influence_mask.astype(bool)] / self.redundancy_mask[agent.influence_mask.astype(bool)]
+			# 		) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
+			# 		]
+			# 	)
+			
+			# changes_uncertinty = np.array(
+			# 	[np.sum(
+			# 		changes_in_model_uncertainty[agent.influence_mask.astype(bool)]  / self.redundancy_mask[agent.influence_mask.astype(bool)]
+			# 		) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
+			# 		]
+			# 	)
+
+			ponderation_maps = [np.zeros_like(self.scenario_map) for _ in range(self.n_agents)]
+			for i, j in np.argwhere(self.redundancy_mask > 0):
+					# Check if the influence area of every agent is in the pixel. If true, save its id
+					agents_in_pixel = [agent_id for agent_id, agent in enumerate(self.fleet.vehicles) if agent.influence_mask[i,j] == 1 and self.active_agents[agent_id]]
+					stds_in_pixel = [1 / self.std_sensormeasure[agent_id] if agent_id in agents_in_pixel else 0 for agent_id in range(self.n_agents)]
+					ponderations = stds_in_pixel/(np.sum(stds_in_pixel))
+					for agent_id, ponderation in enumerate(ponderations):
+						ponderation_maps[agent_id][i,j] = ponderation
+
 			changes_mean = np.array(
 				[np.sum(
-					changes_in_model_mean[agent.influence_mask.astype(bool)] / self.redundancy_mask[agent.influence_mask.astype(bool)]
+					changes_in_model_mean[agent.influence_mask.astype(bool)] * ponderation_maps[idx][agent.influence_mask.astype(bool)]
 					) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
 					]
 				)
 			
 			changes_uncertinty = np.array(
 				[np.sum(
-					changes_in_model_uncertainty[agent.influence_mask.astype(bool)]  / self.redundancy_mask[agent.influence_mask.astype(bool)]
+					changes_in_model_uncertainty[agent.influence_mask.astype(bool)] * ponderation_maps[idx][agent.influence_mask.astype(bool)]
 					) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
 					]
 				)
@@ -757,7 +780,7 @@ class MultiAgentMonitoring:
 			# Inverse error to obtain higher reward when error is lower
 			ponderated_improvement = np.array(
 				[np.sum(
-					error_improve[agent.influence_mask.astype(bool)]  * ponderation_maps[idx][agent.influence_mask.astype(bool)]
+					error_improve[agent.influence_mask.astype(bool)] * ponderation_maps[idx][agent.influence_mask.astype(bool)]
 					) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
 					]
 				)
