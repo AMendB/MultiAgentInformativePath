@@ -1,56 +1,59 @@
 import sys
+import json
 sys.path.append('.')
 
-from Environment.PatrollingEnvironments import MultiAgentPatrolling
-from Algorithm.RainbowDQL.Agent.DuelingDQNAgent import MultiAgentDuelingDQNAgent
+from Environment.MonitoringEnvironment import MultiAgentMonitoring
+from Algorithms.DRL.Agent.DuelingDQNAgent import MultiAgentDuelingDQNAgent
 import numpy as np
 
+path_to_training_folder = 'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Influence_10_0/'
 
-sc_map = np.genfromtxt('Environment/Maps/example_map.csv', delimiter=',')
-initial_positions = np.asarray([[24, 21],
-                                [28, 24],
-                                [27, 19],
-                                [24, 24]])
+f = open(path_to_training_folder + 'environment_config.json',)
+env_config = json.load(f)
+f.close()
 
-env = MultiAgentPatrolling(scenario_map=sc_map,
-	                           fleet_initial_positions=initial_positions,
-	                           distance_budget=150,
-	                           number_of_vehicles=len(initial_positions),
-	                           seed=10,
-							   miopic=True,
-	                           detection_length=2,
-	                           movement_length=2,
-	                           max_collisions=10,
-	                           forget_factor=0.5,
-	                           attrittion=0.1,
-	                           networked_agents=False,
-							   reward_type='model_changes',
-							   ground_truth_type='algae_bloom',
-	                           obstacles=True,
-                               frame_stacking = 1,
-                               state_index_stacking = (2,3,4))
+scenario_map = np.array(env_config['scenario_map'])
+n_agents = env_config['number_of_agents'] # 1 #
+reward_function = env_config['reward_function']
+reward_weights = tuple(env_config['reward_weights'])
 
-multiagent = MultiAgentDuelingDQNAgent(env=env,
-									   memory_size=int(1E3),
-									   batch_size=64,
-									   target_update=1000,
-									   soft_update=False,
-									   tau=0.0001,
-									   epsilon_values=[1.0, 0.1],
-									   epsilon_interval=[0.0, 0.33],
-									   learning_starts=0,
-									   gamma=0.99,
-									   lr=1e-4,
-									   noisy=False,
-									   train_every=10000,
-									   save_every=5000,
-									   distributional=False,
-									   masked_actions=True)
+env = MultiAgentMonitoring(scenario_map=scenario_map,
+					number_of_agents=n_agents,
+					max_distance_travelled=env_config['max_distance_travelled'],
+					mean_sensormeasure=np.array(env_config['mean_sensormeasure']),
+					range_std_sensormeasure=tuple(env_config['range_std_sensormeasure']),
+					std_sensormeasure= np.array([0.05, 0.10, 0.20, 0.40])[:n_agents], #np.array(env_config['std_sensormeasure']),#
+					fleet_initial_positions=env_config['fleet_initial_positions'], #np.array(env_config['fleet_initial_positions']), #
+					seed=3,
+					movement_length=env_config['movement_length'],
+					influence_length=env_config['influence_length'],
+					flag_to_check_collisions_within=env_config['flag_to_check_collisions_within'],
+					max_collisions=env_config['max_collisions'],
+					reward_function=reward_function,
+					ground_truth_type=env_config['ground_truth_type'],
+					peaks_location='Random',
+					dynamic=env_config['dynamic'],
+					obstacles=env_config['obstacles'],
+					regression_library=env_config['regression_library'],
+					reward_weights=reward_weights,
+					scale_kernel=env_config['scale_kernel'],
+					show_plot_graphics=True,
+                                        )
 
+network = MultiAgentDuelingDQNAgent(env=env,
+						memory_size=int(1E3),  #int(1E6), 1E5
+						batch_size=64,
+						target_update=1000,
+						seed = 3,
+						concensus_actions=True,
+						device='cuda:0',
+						network_with_sensornoises = True,
+						independent_networks_by_sensors_type = False,
+						)
 
-multiagent.load_model('Evaluation/Episode_45000_Policy.pth')
+network.load_model(path_to_training_folder + 'BestPolicy.pth')
 
-results = multiagent.evaluate_env(10, render=True)
+results = network.evaluate_env(10, render=True)
 
 print(results)
 

@@ -261,6 +261,13 @@ class MultiAgentMonitoring:
 		self.visitable_locations = np.vstack(np.where(self.scenario_map != 0)).T # coords of visitable cells
 		self.flag_to_check_collisions_within = flag_to_check_collisions_within
 
+		# Visualization #
+		self.activate_plot_graphics = show_plot_graphics
+		self.states = None
+		self.state_to_render_first_active_agent = None
+		self.render_fig = None
+		self.colored_agents = True
+		
 		# Initial positions #
 		self.backup_fleet_initial_positions_entry = fleet_initial_positions
 		if isinstance(fleet_initial_positions, np.ndarray): # Set initial positions if indicated #
@@ -287,21 +294,7 @@ class MultiAgentMonitoring:
 		self.mean_sensormeasure = mean_sensormeasure
 		self.range_std_sensormeasure = range_std_sensormeasure
 		self.backup_std_sensormeasure_entry = std_sensormeasure
-		if isinstance(std_sensormeasure, np.ndarray):
-			self.random_std_sensormeasure = False
-			self.std_sensormeasure = std_sensormeasure
-		elif std_sensormeasure == 'random':
-			self.random_std_sensormeasure = True
-			self.std_sensormeasure = self.rng_std_sensormeasure.uniform(self.range_std_sensormeasure[0], self.range_std_sensormeasure[1], self.n_agents)
-		
-		self.scale_std = (1 - 0.25) / (self.range_std_sensormeasure[1] - self.range_std_sensormeasure[0]) # scale std between 0.25 and 1
-		self.scaled_std_sensormeasure = np.abs((self.std_sensormeasure - self.range_std_sensormeasure[0]) * self.scale_std - 1) # used to inform network the std of every agent though the state (0.25 worst, 1 best)
-		self.variance_sensormeasure = self.std_sensormeasure**2 # variance = std^2
-		self.normalized_variance_sensormeasure =  (self.variance_sensormeasure - self.range_std_sensormeasure[0]**2) / (self.range_std_sensormeasure[1]**2 - self.range_std_sensormeasure[0]**2 ) # used in DQN as input for network_with_sensornoises to normalize variance between 0 to 1
-
-		self.sensors_type = np.searchsorted(np.unique(self.std_sensormeasure), self.std_sensormeasure) # to difference between agents by its quality
-		self.n_sensors_type = len(np.unique(self.std_sensormeasure))
-		self.masks_by_type = [self.sensors_type == type for type in range(self.n_sensors_type)]
+		self.set_agents_specs(init=True)
 	
 		# Limits to be declared a death/done agent and initialize done dict #
 		self.max_distance_travelled = max_distance_travelled
@@ -338,7 +331,6 @@ class MultiAgentMonitoring:
 		self.model_mean_map = np.zeros_like(self.scenario_map) 
 		self.model_uncertainty_map = np.zeros_like(self.scenario_map) 
 
-
 		# Init the redundancy mask #
 		self.redundancy_mask = np.sum([agent.influence_mask for idx, agent in enumerate(self.fleet.vehicles) if self.active_agents[idx]], axis = 0)
 
@@ -356,22 +348,44 @@ class MultiAgentMonitoring:
 		else:
 			raise NotImplementedError("This library is not implemented. Choose one that is.")
 
-		# Visualization #
-		self.activate_plot_graphics = show_plot_graphics
-		self.states = None
-		self.state_to_render_first_active_agent = None
-		self.render_fig = None
-		self.colored_agents = True
-		if self.colored_agents:
-			self.colors_agents = ['black', 'gainsboro']
-			palettes_by_sensors_type = {0: ['green', 'mediumseagreen', 'seagreen', 'olive'], 1: ['darkred', 'indianred', 'tomato'], 2: ['sandybrown', 'peachpuff'], 3: ['darkmagenta']}
-			for agent in range(self.n_agents):
-				self.colors_agents.extend([palettes_by_sensors_type[self.sensors_type[agent]].pop(0)])
-			self.agents_colormap = matplotlib.colors.ListedColormap(self.colors_agents)
-			self.n_colors_agents_render = len(self.colors_agents)
-
 		# Info for training # 
 		self.observation_space_shape = (5, *self.scenario_map.shape)
+		
+	def set_agents_specs(self, init=False, reset=False):
+
+		# Initial sensors noise #
+		if init:
+			if isinstance(self.backup_std_sensormeasure_entry, np.ndarray):
+				self.random_std_sensormeasure = False
+				self.std_sensormeasure = self.backup_std_sensormeasure_entry
+			elif self.backup_std_sensormeasure_entry == 'random':
+				self.random_std_sensormeasure = True
+		
+			self.scale_std = (1 - 0.25) / (self.range_std_sensormeasure[1] - self.range_std_sensormeasure[0]) # scale std between 0.25 and 1
+
+		# Get new std every time if random True #
+		if self.random_std_sensormeasure:
+			self.std_sensormeasure = self.rng_std_sensormeasure.uniform(self.range_std_sensormeasure[0], self.range_std_sensormeasure[1], self.n_agents) 
+
+		# Calculate information for training #
+		if init or (reset and self.random_std_sensormeasure):
+			self.variance_sensormeasure = self.std_sensormeasure**2 # variance = std^2
+			self.scaled_std_sensormeasure = np.abs((self.std_sensormeasure - self.range_std_sensormeasure[0]) * self.scale_std - 1) # used in DQN to inform network the std of every agent through the state (0.25 worst, 1 best)
+			self.normalized_variance_sensormeasure =  (self.variance_sensormeasure - self.range_std_sensormeasure[0]**2) / (self.range_std_sensormeasure[1]**2 - self.range_std_sensormeasure[0]**2 ) # used in DQN as input for network_with_sensornoises to normalize variance between 0 to 1
+
+			# Differentiate between agents by their quality #
+			self.sensors_type = np.searchsorted(np.unique(self.std_sensormeasure), self.std_sensormeasure) 
+			self.n_sensors_type = len(np.unique(self.std_sensormeasure))
+			self.masks_by_type = [self.sensors_type == type for type in range(self.n_sensors_type)]
+
+			# Colors for visualization #
+			if self.colored_agents:
+				self.colors_agents = ['black', 'gainsboro']
+				palettes_by_sensors_type = {0: ['green', 'mediumseagreen', 'seagreen', 'olive'], 1: ['darkred', 'indianred', 'tomato'], 2: ['sandybrown', 'peachpuff'], 3: ['darkmagenta']}
+				for agent in range(self.n_agents):
+					self.colors_agents.extend([palettes_by_sensors_type[self.sensors_type[agent]].pop(0)])
+				self.agents_colormap = matplotlib.colors.ListedColormap(self.colors_agents)
+				self.n_colors_agents_render = len(self.colors_agents)
 
 	def reset_env(self):
 		""" Reset the environment """
@@ -401,32 +415,15 @@ class MultiAgentMonitoring:
 		self.previous_model_uncertainty_map = self.model_uncertainty_map.copy()
 		self.gaussian_process.reset()
 
-		# Get new std if random True #
-		if self.random_std_sensormeasure:
-			self.std_sensormeasure = self.rng_std_sensormeasure.uniform(self.range_std_sensormeasure[0], self.range_std_sensormeasure[1], self.n_agents)
-			self.scaled_std_sensormeasure = np.abs((self.std_sensormeasure - self.range_std_sensormeasure[0]) * self.scale_std - 1) # used to inform network the std of every agent though the state (0.25 worst, 1 best)
-			self.variance_sensormeasure = self.std_sensormeasure**2 # variance = std^2
-			self.normalized_variance_sensormeasure =  (self.variance_sensormeasure - self.range_std_sensormeasure[0]**2) / (self.range_std_sensormeasure[1]**2 - self.range_std_sensormeasure[0]**2 ) # used in DQN as input for network_with_sensornoises to normalize variance between 0 to 1
-
-			self.sensors_type = np.searchsorted(np.unique(self.std_sensormeasure), self.std_sensormeasure) # to difference between agents by its quality
-			self.n_sensors_type = len(np.unique(self.std_sensormeasure))
-			self.masks_by_type = [self.sensors_type == type for type in range(self.n_sensors_type)]
-
-			# New info for visualization #
-			if self.colored_agents:
-				self.colors_agents = ['black', 'gainsboro']
-				palettes_by_sensors_type = {0: ['green', 'mediumseagreen', 'seagreen', 'olive'], 1: ['darkred', 'indianred', 'tomato'], 2: ['sandybrown', 'peachpuff'], 3: ['darkmagenta']}
-				for agent in range(self.n_agents):
-					self.colors_agents.extend([palettes_by_sensors_type[self.sensors_type[agent]].pop(0)])
-				self.agents_colormap = matplotlib.colors.ListedColormap(self.colors_agents)
-				self.n_colors_agents_render = len(self.colors_agents)
-
 		# Get the N random initial positions #
 		if self.random_inititial_positions == 'area' or self.random_inititial_positions == 'fixed':
 			self.initial_positions = np.argwhere(self.deployment_positions == 1)[self.rng_positions.choice(len(np.argwhere(self.deployment_positions == 1)), self.n_agents, replace=False)]
 		elif self.random_inititial_positions is True:
 			random_positions_indx = self.rng_positions.choice(np.arange(0, len(self.visitable_locations)), self.n_agents, replace=False)
 			self.initial_positions = self.visitable_locations[random_positions_indx]
+
+		# Set new agents specs #
+		self.set_agents_specs(reset=True)
 		
 		# Reset the positions of the fleet #
 		self.fleet.reset_fleet(initial_positions=self.initial_positions)
@@ -723,42 +720,44 @@ class MultiAgentMonitoring:
 			changes_in_model_mean = np.abs(self.model_mean_map - self.previous_model_mean_map)
 			changes_in_model_uncertainty = np.abs(self.model_uncertainty_map - self.previous_model_uncertainty_map)
 
-			# changes_mean = np.array(
-			# 	[np.sum(
-			# 		changes_in_model_mean[agent.influence_mask.astype(bool)] / self.redundancy_mask[agent.influence_mask.astype(bool)]
-			# 		) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
-			# 		]
-			# 	)
-			
-			# changes_uncertinty = np.array(
-			# 	[np.sum(
-			# 		changes_in_model_uncertainty[agent.influence_mask.astype(bool)]  / self.redundancy_mask[agent.influence_mask.astype(bool)]
-			# 		) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
-			# 		]
-			# 	)
+			ponderation = True
+			if not ponderation:
+				changes_mean = np.array(
+					[np.sum(
+						changes_in_model_mean[agent.influence_mask.astype(bool)] / self.redundancy_mask[agent.influence_mask.astype(bool)]
+						) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
+						]
+					)
+				
+				changes_uncertinty = np.array(
+					[np.sum(
+						changes_in_model_uncertainty[agent.influence_mask.astype(bool)]  / self.redundancy_mask[agent.influence_mask.astype(bool)]
+						) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
+						]
+					)
+			else:
+				ponderation_maps = [np.zeros_like(self.scenario_map) for _ in range(self.n_agents)]
+				for i, j in np.argwhere(self.redundancy_mask > 0):
+						# Check if the influence area of every agent is in the pixel. If true, save its id
+						agents_in_pixel = [agent_id for agent_id, agent in enumerate(self.fleet.vehicles) if agent.influence_mask[i,j] == 1 and self.active_agents[agent_id]]
+						stds_in_pixel = [1 / self.std_sensormeasure[agent_id] if agent_id in agents_in_pixel else 0 for agent_id in range(self.n_agents)]
+						ponderations = stds_in_pixel/(np.sum(stds_in_pixel))
+						for agent_id, ponderation in enumerate(ponderations):
+							ponderation_maps[agent_id][i,j] = ponderation
 
-			ponderation_maps = [np.zeros_like(self.scenario_map) for _ in range(self.n_agents)]
-			for i, j in np.argwhere(self.redundancy_mask > 0):
-					# Check if the influence area of every agent is in the pixel. If true, save its id
-					agents_in_pixel = [agent_id for agent_id, agent in enumerate(self.fleet.vehicles) if agent.influence_mask[i,j] == 1 and self.active_agents[agent_id]]
-					stds_in_pixel = [1 / self.std_sensormeasure[agent_id] if agent_id in agents_in_pixel else 0 for agent_id in range(self.n_agents)]
-					ponderations = stds_in_pixel/(np.sum(stds_in_pixel))
-					for agent_id, ponderation in enumerate(ponderations):
-						ponderation_maps[agent_id][i,j] = ponderation
-
-			changes_mean = np.array(
-				[np.sum(
-					changes_in_model_mean[agent.influence_mask.astype(bool)] * ponderation_maps[idx][agent.influence_mask.astype(bool)]
-					) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
-					]
-				)
-			
-			changes_uncertinty = np.array(
-				[np.sum(
-					changes_in_model_uncertainty[agent.influence_mask.astype(bool)] * ponderation_maps[idx][agent.influence_mask.astype(bool)]
-					) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
-					]
-				)
+				changes_mean = np.array(
+					[np.sum(
+						changes_in_model_mean[agent.influence_mask.astype(bool)] * ponderation_maps[idx][agent.influence_mask.astype(bool)]
+						) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
+						]
+					)
+				
+				changes_uncertinty = np.array(
+					[np.sum(
+						changes_in_model_uncertainty[agent.influence_mask.astype(bool)] * ponderation_maps[idx][agent.influence_mask.astype(bool)]
+						) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
+						]
+					)
 
 			rewards = self.reward_weights[0] * changes_mean + self.reward_weights[1] * changes_uncertinty
 		

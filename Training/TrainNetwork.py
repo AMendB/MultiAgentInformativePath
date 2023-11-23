@@ -85,7 +85,7 @@ network = MultiAgentDuelingDQNAgent(env=env,
 									soft_update=True,
 									tau=0.001,
 									epsilon_values=[1.0, 0.05],
-									epsilon_interval=[0.0, 0.5], #0.33
+									epsilon_interval=[0.0, 0.33], #0.5
 									learning_starts=100, 
 									gamma=0.99,
 									lr=1e-4,

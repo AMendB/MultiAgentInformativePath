@@ -8,8 +8,8 @@ from tqdm import trange
 import pandas as pd
 from cycler import cycler
 
-from Environment.MonitoringEnvironmentPenultimate import MultiAgentMonitoring
-# from Environment.MonitoringEnvironment import MultiAgentMonitoring
+# from Environment.MonitoringEnvironmentPenultimate import MultiAgentMonitoring
+from Environment.MonitoringEnvironment import MultiAgentMonitoring
 from Evaluation.Utils.metrics_wrapper import MetricsDataCreator
 
 
@@ -425,11 +425,13 @@ if __name__ == '__main__':
         # 'DoneTrainings/runs_2A/Alg_Network_RW_Influence_10_0/', ##
         # 'DoneTrainings/runs_4A/Alg_Network_RW_Influence_5_5/',  
         # 'DoneTrainings/runs_4A/Alg_Network_RW_Influence_10_0/',  ##
-        'DoneTrainings/Penultimate/runs_4A/Alg_Network_RW_Influence_10_0/',  ##
+        # 'DoneTrainings/Penultimate/runs_4A/Alg_Network_RW_Influence_10_0/',  ##
+        # 'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Influence_10_0/',  ##
+        'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Error_10_0/',  ##
         ]
 
     SHOW_FINAL_PLOT_GRAPHICS = False
-    SHOW_PLOT_GRAPHICS = True
+    SHOW_PLOT_GRAPHICS = False
     SAVE_PLOTS = True
     SAVE_COLLAGES = True
     RUNS = 100
