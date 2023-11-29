@@ -427,7 +427,9 @@ if __name__ == '__main__':
         # 'DoneTrainings/runs_4A/Alg_Network_RW_Influence_10_0/',  ##
         # 'DoneTrainings/Penultimate/runs_4A/Alg_Network_RW_Influence_10_0/',  ##
         # 'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Influence_10_0/',  ##
-        'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Error_10_0/',  ##
+        # 'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Error_10_0/',  ##
+        # 'DoneTrainings/entry_not_normalized_var_runs4A/Alg_Network_RW_Influence_10_0/',  ##
+        'DoneTrainings/entry_std_sensor_runs_4A/Alg_Network_RW_Influence_10_0/',  ##
         ]
 
     SHOW_FINAL_PLOT_GRAPHICS = False
@@ -437,8 +439,8 @@ if __name__ == '__main__':
     RUNS = 100
     SEED = 3
     # STDs_SENSORS = [np.array([0.005,0.005]), np.array([0.05,0.05]), np.array([0.5,0.5])]
-    STDs_SENSORS = [np.array([0.005,0.005,0.005,0.005]), np.array([0.05,0.05,0.05,0.05]), np.array([0.5,0.5,0.5,0.5])]
-    # STDs_SENSORS = [np.array([0.005,0.5,0.5,0.5])]
+    # STDs_SENSORS = [np.array([0.005,0.005,0.005,0.005]), np.array([0.05,0.05,0.05,0.05]), np.array([0.5,0.5,0.5,0.5])]
+    STDs_SENSORS = [np.array([0.005,0.05,0.5,0.5])]
     # STD_SENSORS = np.array([0.005,0.005,0.005,0.005]) #np.array([0.005,0.05,0.075,0.5]) #'random' #np.array([0.1, 0.25, 0.1, 0.25])[:n_agents]
     # STD_SENSORS = np.array([0.05,0.05,0.05,0.05]) #np.array([0.005,0.05,0.075,0.5]) #'random' #np.array([0.1, 0.25, 0.1, 0.25])[:n_agents]
     # STD_SENSORS = np.array([0.5,0.5,0.5,0.5]) #np.array([0.005,0.05,0.075,0.5]) #'random' #np.array([0.1, 0.25, 0.1, 0.25])[:n_agents]
@@ -450,7 +452,8 @@ if __name__ == '__main__':
 
 
     range_std_sensormeasure = (1*0.5/100, 1*0.5*100/100) # AML is "the best", from then on 100 times worse
-    for peaks_location in ['Random', 'Upper', 'MiddleLeft', 'MiddleRight', 'Middle', 'Bottom']:
+    for peaks_location in ['Random']:
+    # for peaks_location in ['Random', 'Upper', 'MiddleLeft', 'MiddleRight', 'Middle', 'Bottom']:
         saving_paths = []
         data_table_average = pd.DataFrame() 
         wilcoxon_dict = {}              
@@ -630,7 +633,7 @@ if __name__ == '__main__':
                     # Take first actions #
                     if selected_algorithm == 'Network_With_SensorNoises' or selected_algorithm == 'Independent_Networks_By_Sensors_Type':
                         network.nogobackfleet_masking_module.reset()
-                        actions = network.select_concensus_actions(states=states, norm_variance=env.normalized_variance_sensormeasure, positions=env.get_active_agents_positions_dict(), n_actions=env.n_actions, done = done)
+                        actions = network.select_concensus_actions(states=states, sensor_error=env.std_sensormeasure, positions=env.get_active_agents_positions_dict(), n_actions=env.n_actions, done = done)
                     else:
                         actions = {i: selected_algorithm_agents[i].move(env.fleet.vehicles[i].actual_agent_position) for i in range(n_agents)}
 
@@ -651,7 +654,7 @@ if __name__ == '__main__':
 
                         # Take new actions #
                         if selected_algorithm == 'Network_With_SensorNoises' or selected_algorithm == 'Independent_Networks_By_Sensors_Type':
-                            actions = network.select_concensus_actions(states=states, norm_variance=env.normalized_variance_sensormeasure, positions=env.get_active_agents_positions_dict(), n_actions=env.n_actions, done = done)
+                            actions = network.select_concensus_actions(states=states, sensor_error=env.std_sensormeasure, positions=env.get_active_agents_positions_dict(), n_actions=env.n_actions, done = done)
                         else:
                             actions = {i: selected_algorithm_agents[i].move(env.fleet.vehicles[i].actual_agent_position) for i in range(n_agents)}
 

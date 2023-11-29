@@ -267,7 +267,7 @@ class MultiAgentMonitoring:
 		self.state_to_render_first_active_agent = None
 		self.render_fig = None
 		self.colored_agents = True
-		
+
 		# Initial positions #
 		self.backup_fleet_initial_positions_entry = fleet_initial_positions
 		if isinstance(fleet_initial_positions, np.ndarray): # Set initial positions if indicated #
@@ -371,7 +371,7 @@ class MultiAgentMonitoring:
 		if init or (reset and self.random_std_sensormeasure):
 			self.variance_sensormeasure = self.std_sensormeasure**2 # variance = std^2
 			self.scaled_std_sensormeasure = np.abs((self.std_sensormeasure - self.range_std_sensormeasure[0]) * self.scale_std - 1) # used in DQN to inform network the std of every agent through the state (0.25 worst, 1 best)
-			self.normalized_variance_sensormeasure =  (self.variance_sensormeasure - self.range_std_sensormeasure[0]**2) / (self.range_std_sensormeasure[1]**2 - self.range_std_sensormeasure[0]**2 ) # used in DQN as input for network_with_sensornoises to normalize variance between 0 to 1
+			# self.normalized_variance_sensormeasure =  (self.variance_sensormeasure - self.range_std_sensormeasure[0]**2) / (self.range_std_sensormeasure[1]**2 - self.range_std_sensormeasure[0]**2 ) # used in DQN as input for network_with_sensornoises to normalize variance between 0 to 1
 
 			# Differentiate between agents by their quality #
 			self.sensors_type = np.searchsorted(np.unique(self.std_sensormeasure), self.std_sensormeasure) 
@@ -456,23 +456,24 @@ class MultiAgentMonitoring:
 		ground_truth = self.ground_truth.read() 
 
 		# Save positions where samples are taken #
-		position_measures = [[agent.actual_agent_position[0], agent.actual_agent_position[1]] for idx, agent in enumerate(self.fleet.vehicles) if self.active_agents[idx]]
-		
+		position_measures = self.get_active_agents_positions_dict().values()
+
 		# Take the sample and add noise, saturate between 0 and 1 with clip#
-		noisy_measures = np.clip([ground_truth[pose_x, pose_y] + np.random.normal(mean, std) for (pose_x, pose_y), mean, std in zip(position_measures, self.mean_sensormeasure, self.std_sensormeasure)], 0, 1)
+		noisy_measures = np.clip([ground_truth[pose[0], pose[1]] + np.random.normal(self.mean_sensormeasure[idx], self.std_sensormeasure[idx]) for idx, pose in self.get_active_agents_positions_dict().items()], 0, 1)
+		# new_measures_dict = np.clip({idx: ground_truth[pose[0], pose[1]] + np.random.normal(self.mean_sensormeasure[idx], self.std_sensormeasure[idx]) for idx, pose in self.get_active_agents_positions_dict().items()}, 0, 1)
 
 		# Variance associated to the measures #
-		variance_measures = np.array([self.variance_sensormeasure[idx] for idx in self.active_agents if self.active_agents[idx]]) 
+		variance_of_measures = np.array([self.variance_sensormeasure[idx] for idx in self.active_agents if self.active_agents[idx]]) 
 
-		return position_measures, noisy_measures, variance_measures
+		return position_measures, noisy_measures, variance_of_measures
 	
 	def update_model(self):
 
 		# Sensor samples #
-		position_new_measures, new_measures, variance_measures = self.take_samples()
+		position_new_measures, self.new_measures, variance_of_measures = self.take_samples()
 		
 		# Fit gaussian process with new samples #
-		self.gaussian_process.fit_gp(X_new=position_new_measures, y_new=new_measures, variances_new=variance_measures)
+		self.gaussian_process.fit_gp(X_new=position_new_measures, y_new=self.new_measures, variances_new=variance_of_measures)
 		
 		# Update model: prediction of ground truth #
 		self.previous_model_mean_map = self.model_mean_map.copy()
@@ -720,8 +721,8 @@ class MultiAgentMonitoring:
 			changes_in_model_mean = np.abs(self.model_mean_map - self.previous_model_mean_map)
 			changes_in_model_uncertainty = np.abs(self.model_uncertainty_map - self.previous_model_uncertainty_map)
 
-			ponderation = True
-			if not ponderation:
+			ponderation_by_stds = True
+			if not ponderation_by_stds:
 				changes_mean = np.array(
 					[np.sum(
 						changes_in_model_mean[agent.influence_mask.astype(bool)] / self.redundancy_mask[agent.influence_mask.astype(bool)]
@@ -758,8 +759,16 @@ class MultiAgentMonitoring:
 						) if self.active_agents[idx] else 0 for idx, agent in enumerate(self.fleet.vehicles)
 						]
 					)
-
-			rewards = self.reward_weights[0] * changes_mean + self.reward_weights[1] * changes_uncertinty
+			
+			ponderation_by_measure_importance = True
+			if ponderation_by_measure_importance:
+				measures = self.new_measures.copy()
+				for id, value in self.done.items():
+					if value:
+						measures = np.insert(measures, id, 0)
+				rewards = self.reward_weights[0] * (changes_mean + 5*measures) + self.reward_weights[1] * changes_uncertinty
+			else:	
+				rewards = self.reward_weights[0] * changes_mean + self.reward_weights[1] * changes_uncertinty
 		
 		elif self.reward_function == 'Error_with_model':
 
@@ -921,7 +930,7 @@ if __name__ == '__main__':
 							   influence_length = influence_length,
 							   flag_to_check_collisions_within = True,
 							   max_collisions = 1000,
-							   reward_function = 'Error_with_model',  # Position_changes_model, Influence_area_changes_model, Error_with_model
+							   reward_function = 'Influence_area_changes_model',  # Position_changes_model, Influence_area_changes_model, Error_with_model
 							   ground_truth_type = 'shekel',
 							   dynamic = False,
 							   obstacles = False,

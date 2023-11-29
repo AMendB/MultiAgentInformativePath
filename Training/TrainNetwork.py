@@ -11,7 +11,7 @@ reward_weights = (10, 0) #(1.0, 0.1)
 memory_size = int(1E6)
 network_type = 'network_with_sensornoises' # network_with_sensornoises, independent_networks_by_sensors_type
 device = 'cuda:0'
-episodes = 150000
+episodes = 100000
 n_agents = 4  # max 4
 
 

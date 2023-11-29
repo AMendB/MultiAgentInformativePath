@@ -227,7 +227,7 @@ class MultiAgentDuelingDQNAgent:
 
 		return actions
 
-	def select_concensus_actions(self, states: dict, norm_variance: np.ndarray, positions: np.ndarray, n_actions: int, done: dict, deterministic: bool = False):
+	def select_concensus_actions(self, states: dict, sensor_error: np.ndarray, positions: np.ndarray, n_actions: int, done: dict, deterministic: bool = False):
 		""" Select an action masked to avoid collisions and so """
 		
 		# Update map if dynamic #
@@ -240,7 +240,7 @@ class MultiAgentDuelingDQNAgent:
 		else:
 			# The network compute the q's #
 			if self.network_with_sensornoises:
-				q_values = {agent_id: self.dqn(torch.FloatTensor(state).unsqueeze(0).to(self.device), torch.FloatTensor([norm_variance[agent_id]]).unsqueeze(0).to(self.device)).detach().cpu().numpy().flatten() for agent_id, state in states.items() if not done[agent_id]}
+				q_values = {agent_id: self.dqn(torch.FloatTensor(state).unsqueeze(0).to(self.device), torch.FloatTensor([sensor_error[agent_id]]).unsqueeze(0).to(self.device)).detach().cpu().numpy().flatten() for agent_id, state in states.items() if not done[agent_id]}
 			elif self.independent_networks_by_sensors_type:
 				q_values = {agent_id: self.dqn[self.env.sensors_type[agent_id]](torch.FloatTensor(state).unsqueeze(0).to(self.device)).detach().cpu().numpy().flatten() for agent_id, state in states.items() if not done[agent_id]}
 			else:
@@ -395,7 +395,7 @@ class MultiAgentDuelingDQNAgent:
 					steps += 1
 
 					# Select the action using the current policy #
-					actions = self.select_concensus_actions(states=states, norm_variance=self.env.normalized_variance_sensormeasure, positions=self.env.get_active_agents_positions_dict(), n_actions=self.env.n_actions, done = done)
+					actions = self.select_concensus_actions(states=states, sensor_error=self.env.std_sensormeasure, positions=self.env.get_active_agents_positions_dict(), n_actions=self.env.n_actions, done = done)
 
 					# Process the agent step #
 					next_states, reward, done = self.step(actions)
@@ -540,7 +540,7 @@ class MultiAgentDuelingDQNAgent:
 
 					# Select the action using the current policy #
 					if self.concensus_actions:
-						actions = self.select_concensus_actions(states=states, norm_variance=self.env.normalized_variance_sensormeasure, positions=self.env.get_active_agents_positions_dict(), n_actions=self.env.n_actions, done = done)
+						actions = self.select_concensus_actions(states=states, sensor_error=self.env.std_sensormeasure, positions=self.env.get_active_agents_positions_dict(), n_actions=self.env.n_actions, done = done)
 					elif self.masked_actions:
 						actions = self.select_masked_actions(states=states, positions=self.env.fleet.get_positions())
 					else:
@@ -557,7 +557,7 @@ class MultiAgentDuelingDQNAgent:
 											reward[agent_id],
 											next_states[agent_id],
 											done[agent_id],
-											{"norm_variance": self.env.normalized_variance_sensormeasure[agent_id]} if self.network_with_sensornoises else {}]
+											{"sensor_error": self.env.std_sensormeasure[agent_id]} if self.network_with_sensornoises else {}]
 
 						self.memory.store(*self.transition)
 
@@ -639,14 +639,14 @@ class MultiAgentDuelingDQNAgent:
 
 		if self.network_with_sensornoises:
 
-			norm_variances = torch.FloatTensor([dict['norm_variance'] for dict in samples['info']]).to(device)
+			sensor_errors = torch.FloatTensor([dict['sensor_error'] for dict in samples['info']]).to(device)
 
 			actions = actions.reshape(-1, 1)
-			curr_q_value = self.dqn(states, norm_variances).gather(1, actions)
+			curr_q_value = self.dqn(states, sensor_errors).gather(1, actions)
 			dones_mask = 1 - dones
 
 			with torch.no_grad():
-				next_q_value = self.dqn_target(next_states, norm_variances).gather(1, self.dqn(next_states, norm_variances).argmax(dim=1, keepdim=True))
+				next_q_value = self.dqn_target(next_states, sensor_errors).gather(1, self.dqn(next_states, sensor_errors).argmax(dim=1, keepdim=True))
 				target = (rewards + self.gamma * next_q_value * dones_mask).to(self.device)
 
 			# calculate element-wise dqn loss
@@ -821,7 +821,7 @@ class MultiAgentDuelingDQNAgent:
 
 					# Select the action using the current policy
 					if self.concensus_actions:
-						actions = self.select_concensus_actions(states=states, norm_variance=self.env.normalized_variance_sensormeasure, positions=self.env.get_active_agents_positions_dict(), n_actions=self.env.n_actions, done = done)
+						actions = self.select_concensus_actions(states=states, sensor_error=self.env.std_sensormeasure, positions=self.env.get_active_agents_positions_dict(), n_actions=self.env.n_actions, done = done)
 					elif self.masked_actions:
 						actions = self.select_masked_actions(states=states, positions=self.env.fleet.get_positions())
 					else:
@@ -872,7 +872,7 @@ class MultiAgentDuelingDQNAgent:
 
 					# Select the action using the current policy
 					if self.concensus_actions:
-						actions = self.select_concensus_actions(states=states, norm_variance=self.env.normalized_variance_sensormeasure, positions=self.env.get_active_agents_positions_dict(), n_actions=self.env.n_actions, done = done)
+						actions = self.select_concensus_actions(states=states, sensor_error=self.env.std_sensormeasure, positions=self.env.get_active_agents_positions_dict(), n_actions=self.env.n_actions, done = done)
 					elif self.masked_actions:
 						actions = self.select_masked_actions(states=states, positions=self.env.fleet.get_positions())
 					else:
