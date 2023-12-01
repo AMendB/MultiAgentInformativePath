@@ -196,11 +196,14 @@ class AlgorithmRecorderAndAnalizer:
             if plot_std:
                 ax[0][1].fill_between(self.results_std.index, self.results_mean['MSE'] - self.results_std['MSE'], self.results_mean['MSE'] + self.results_std['MSE'], alpha=0.2, label='Std')
 
-            ax[0][2].plot(self.error_r2, '-')
-            ax[0][2].set(title = 'R2_error', xlabel = 'Step')
+            # ax[0][2].plot(self.error_r2, '-')
+            # ax[0][2].set(title = 'R2_error', xlabel = 'Step')
+            ax[0][2].plot(self.mse_peaks, '-')
+            ax[0][2].set(title = 'MSE_peaks', xlabel = 'Step')
             ax[0][2].grid()
             if plot_std:
-                ax[0][2].fill_between(self.results_std.index, self.results_mean['R2_error'] - self.results_std['R2_error'], self.results_mean['R2_error'] + self.results_std['R2_error'], alpha=0.2, label='Std')
+                # ax[0][2].fill_between(self.results_std.index, self.results_mean['R2_error'] - self.results_std['R2_error'], self.results_mean['R2_error'] + self.results_std['R2_error'], alpha=0.2, label='Std')
+                ax[0][2].fill_between(self.results_std.index, self.results_mean['MSE_peaks'] - self.results_std['MSE_peaks'], self.results_mean['MSE_peaks'] + self.results_std['MSE_peaks'], alpha=0.2, label='Std')
 
             ax[1][0].plot(self.uncert_mean, '-')
             ax[1][0].plot(self.uncert_max, '-')
@@ -429,7 +432,8 @@ if __name__ == '__main__':
         # 'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Influence_10_0/',  ##
         # 'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Error_10_0/',  ##
         # 'DoneTrainings/entry_not_normalized_var_runs4A/Alg_Network_RW_Influence_10_0/',  ##
-        'DoneTrainings/entry_std_sensor_runs_4A/Alg_Network_RW_Influence_10_0/',  ##
+        # 'DoneTrainings/entry_std_sensor_runs_4A/Alg_Network_RW_Influence_10_0/',  ##
+        'DoneTrainings/01_12_2023/Alg_Network_RW_Influence_10_0/',  ##
         ]
 
     SHOW_FINAL_PLOT_GRAPHICS = False
@@ -439,8 +443,8 @@ if __name__ == '__main__':
     RUNS = 100
     SEED = 3
     # STDs_SENSORS = [np.array([0.005,0.005]), np.array([0.05,0.05]), np.array([0.5,0.5])]
-    # STDs_SENSORS = [np.array([0.005,0.005,0.005,0.005]), np.array([0.05,0.05,0.05,0.05]), np.array([0.5,0.5,0.5,0.5])]
-    STDs_SENSORS = [np.array([0.005,0.05,0.5,0.5])]
+    STDs_SENSORS = [np.array([0.005,0.005,0.005,0.005]), np.array([0.05,0.05,0.05,0.05]), np.array([0.5,0.5,0.5,0.5])]
+    # STDs_SENSORS = [np.array([0.005,0.05,0.5,0.5])]
     # STD_SENSORS = np.array([0.005,0.005,0.005,0.005]) #np.array([0.005,0.05,0.075,0.5]) #'random' #np.array([0.1, 0.25, 0.1, 0.25])[:n_agents]
     # STD_SENSORS = np.array([0.05,0.05,0.05,0.05]) #np.array([0.005,0.05,0.075,0.5]) #'random' #np.array([0.1, 0.25, 0.1, 0.25])[:n_agents]
     # STD_SENSORS = np.array([0.5,0.5,0.5,0.5]) #np.array([0.005,0.05,0.075,0.5]) #'random' #np.array([0.1, 0.25, 0.1, 0.25])[:n_agents]
@@ -452,8 +456,8 @@ if __name__ == '__main__':
 
 
     range_std_sensormeasure = (1*0.5/100, 1*0.5*100/100) # AML is "the best", from then on 100 times worse
-    for peaks_location in ['Random']:
-    # for peaks_location in ['Random', 'Upper', 'MiddleLeft', 'MiddleRight', 'Middle', 'Bottom']:
+    # for peaks_location in ['Random']:
+    for peaks_location in ['Random', 'Upper', 'MiddleLeft', 'MiddleRight', 'Middle', 'Bottom']:
         saving_paths = []
         data_table_average = pd.DataFrame() 
         wilcoxon_dict = {}              

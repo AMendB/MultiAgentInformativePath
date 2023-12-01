@@ -103,4 +103,4 @@ network = MultiAgentDuelingDQNAgent(env=env,
 									independent_networks_by_sensors_type = independent_networks_by_sensors_type,
 )
 
-network.train(episodes=episodes) #10000
+network.train(episodes=episodes) 

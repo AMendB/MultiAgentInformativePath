@@ -460,7 +460,6 @@ class MultiAgentMonitoring:
 
 		# Take the sample and add noise, saturate between 0 and 1 with clip#
 		noisy_measures = np.clip([ground_truth[pose[0], pose[1]] + np.random.normal(self.mean_sensormeasure[idx], self.std_sensormeasure[idx]) for idx, pose in self.get_active_agents_positions_dict().items()], 0, 1)
-		# new_measures_dict = np.clip({idx: ground_truth[pose[0], pose[1]] + np.random.normal(self.mean_sensormeasure[idx], self.std_sensormeasure[idx]) for idx, pose in self.get_active_agents_positions_dict().items()}, 0, 1)
 
 		# Variance associated to the measures #
 		variance_of_measures = np.array([self.variance_sensormeasure[idx] for idx in self.active_agents if self.active_agents[idx]]) 
@@ -481,7 +480,7 @@ class MultiAgentMonitoring:
 		self.model_mean_map, self.model_uncertainty_map = self.gaussian_process.predict_gt()
 
 		# Saturate prediction between [0, 1] as expected #
-		self.model_mean_map = np.clip( self.model_mean_map, 0, 1 )
+		self.model_mean_map = np.clip(self.model_mean_map, 0, 1)
 		if self.scale_kernel == True:
 			self.model_uncertainty_map = np.clip( self.model_uncertainty_map / self.max_std_scale, 0, 1 )		
 		else:
@@ -540,13 +539,13 @@ class MultiAgentMonitoring:
 		# fleet_position_map = np.zeros_like(self.scenario_map)
 		# fleet_position_map[self.fleet.fleet_positions[:,0], self.fleet.fleet_positions[:,1]] = 1.0 # set 1 where there is an agent
 		fleet_position_map_like_stds = np.zeros_like(self.scenario_map)
-		for agent_id in range(self.n_agents):
-			fleet_position_map_like_stds[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = self.scaled_std_sensormeasure[agent_id] # set its scaled std where there is the agent
+		for agent_id, pose in self.get_active_agents_positions_dict().items():
+			fleet_position_map_like_stds[pose[0], pose[1]] = self.scaled_std_sensormeasure[agent_id] # set its scaled std where there is the agent
 
 		if self.colored_agents == True and self.activate_plot_graphics:
 			fleet_position_map_colored = np.zeros_like(self.scenario_map)
-			for agent_id in self.get_active_agents_positions_dict().keys():
-					fleet_position_map_colored[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = (1/self.n_colors_agents_render)*(agent_id+2) + 0.01
+			for agent_id, pose in self.get_active_agents_positions_dict().items():
+					fleet_position_map_colored[pose[0], pose[1]] = (1/self.n_colors_agents_render)*(agent_id+2) + 0.01
 
 		first_available_agent = np.argmax(list(self.active_agents.values())) # first True in active_agents
 		for agent_id, active in self.active_agents.items():
@@ -739,10 +738,9 @@ class MultiAgentMonitoring:
 			else:
 				ponderation_maps = [np.zeros_like(self.scenario_map) for _ in range(self.n_agents)]
 				for i, j in np.argwhere(self.redundancy_mask > 0):
-						# Check if the influence area of every agent is in the pixel. If true, save its id
-						agents_in_pixel = [agent_id for agent_id, agent in enumerate(self.fleet.vehicles) if agent.influence_mask[i,j] == 1 and self.active_agents[agent_id]]
-						stds_in_pixel = [1 / self.std_sensormeasure[agent_id] if agent_id in agents_in_pixel else 0 for agent_id in range(self.n_agents)]
-						ponderations = stds_in_pixel/(np.sum(stds_in_pixel))
+						# Check which agents influence area are in the pixel and save its inverse std
+						inverse_stds_in_pixel = [1 / self.std_sensormeasure[agent_id] if agent.influence_mask[i,j] == 1 and self.active_agents[agent_id] else 0 for agent_id, agent in enumerate(self.fleet.vehicles)]
+						ponderations = inverse_stds_in_pixel/(np.sum(inverse_stds_in_pixel))
 						for agent_id, ponderation in enumerate(ponderations):
 							ponderation_maps[agent_id][i,j] = ponderation
 
@@ -766,7 +764,7 @@ class MultiAgentMonitoring:
 				for id, value in self.done.items():
 					if value:
 						measures = np.insert(measures, id, 0)
-				rewards = self.reward_weights[0] * (changes_mean + 5*measures) + self.reward_weights[1] * changes_uncertinty
+				rewards = self.reward_weights[0] * (changes_mean + 2.5*measures) + self.reward_weights[1] * changes_uncertinty
 			else:	
 				rewards = self.reward_weights[0] * changes_mean + self.reward_weights[1] * changes_uncertinty
 		
@@ -774,10 +772,9 @@ class MultiAgentMonitoring:
 
 			ponderation_maps = [np.zeros_like(self.scenario_map) for _ in range(self.n_agents)]
 			for i, j in np.argwhere(self.redundancy_mask > 0):
-					# Check if the influence area of every agent is in the pixel. If true, save its id
-					agents_in_pixel = [agent_id for agent_id, agent in enumerate(self.fleet.vehicles) if agent.influence_mask[i,j] == 1 and self.active_agents[agent_id]]
-					stds_in_pixel = [1 / self.std_sensormeasure[agent_id] if agent_id in agents_in_pixel else 0 for agent_id in range(self.n_agents)]
-					ponderations = stds_in_pixel/(np.sum(stds_in_pixel))
+					# Check which agents influence area are in the pixel and save its inverse std
+					inverse_stds_in_pixel = [1 / self.std_sensormeasure[agent_id] if agent.influence_mask[i,j] == 1 and self.active_agents[agent_id] else 0 for agent_id, agent in enumerate(self.fleet.vehicles)]
+					ponderations = inverse_stds_in_pixel/(np.sum(inverse_stds_in_pixel))
 					for agent_id, ponderation in enumerate(ponderations):
 						ponderation_maps[agent_id][i,j] = ponderation
 					
@@ -816,7 +813,7 @@ class MultiAgentMonitoring:
 		return self.model_mean_map[self.visitable_locations[:, 0], self.visitable_locations[:, 1]]
 
 	def get_model_mu_mean_abs_error(self):
-			""" Returns the absolute error """
+			""" Returns the mean absolute error """
 
 			return mean_absolute_error(self.get_gt_in_visitable_locations(), self.get_model_mu_in_visitable_locations())
 
