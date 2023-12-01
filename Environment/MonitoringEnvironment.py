@@ -764,7 +764,7 @@ class MultiAgentMonitoring:
 				for id, value in self.done.items():
 					if value:
 						measures = np.insert(measures, id, 0)
-				rewards = self.reward_weights[0] * (changes_mean + 2.5*measures) + self.reward_weights[1] * changes_uncertinty
+				rewards = self.reward_weights[0] * changes_mean + 5*measures + self.reward_weights[1] * changes_uncertinty
 			else:	
 				rewards = self.reward_weights[0] * changes_mean + self.reward_weights[1] * changes_uncertinty
 		
