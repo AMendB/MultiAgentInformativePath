@@ -350,6 +350,9 @@ class MultiAgentMonitoring:
 
 		# Info for training # 
 		self.observation_space_shape = (5, *self.scenario_map.shape)
+
+		# Map of visited areas #
+		self.visited_map = np.zeros_like(self.scenario_map)
 		
 	def set_agents_specs(self, init=False, reset=False):
 
@@ -361,7 +364,7 @@ class MultiAgentMonitoring:
 			elif self.backup_std_sensormeasure_entry == 'random':
 				self.random_std_sensormeasure = True
 		
-			self.scale_std = (1 - 0.25) / (self.range_std_sensormeasure[1] - self.range_std_sensormeasure[0]) # scale std between 0.25 and 1
+			self.scale_for_std = (1 - 0.25) / (self.range_std_sensormeasure[1] - self.range_std_sensormeasure[0]) # scale std between 0.25 and 1
 
 		# Get new std every time if random True #
 		if self.random_std_sensormeasure:
@@ -370,7 +373,7 @@ class MultiAgentMonitoring:
 		# Calculate information for training #
 		if init or (reset and self.random_std_sensormeasure):
 			self.variance_sensormeasure = self.std_sensormeasure**2 # variance = std^2
-			self.scaled_std_sensormeasure = np.abs((self.std_sensormeasure - self.range_std_sensormeasure[0]) * self.scale_std - 1) # used in DQN to inform network the std of every agent through the state (0.25 worst, 1 best)
+			self.scaled_std_sensormeasure = np.abs((self.std_sensormeasure - self.range_std_sensormeasure[0]) * self.scale_for_std - 1) # used in DQN to inform network the std of every agent through the state (0.25 worst, 1 best)
 			# self.normalized_variance_sensormeasure =  (self.variance_sensormeasure - self.range_std_sensormeasure[0]**2) / (self.range_std_sensormeasure[1]**2 - self.range_std_sensormeasure[0]**2 ) # used in DQN as input for network_with_sensornoises to normalize variance between 0 to 1
 
 			# Differentiate between agents by their quality #
@@ -446,6 +449,9 @@ class MultiAgentMonitoring:
 		if self.render_fig is not None and self.activate_plot_graphics:
 			plt.close(self.render_fig)
 			self.render_fig = None
+		
+		# Map of visited areas #
+		self.visited_map = np.zeros_like(self.scenario_map)
 
 		return self.states
 
@@ -458,7 +464,7 @@ class MultiAgentMonitoring:
 		# Save positions where samples are taken #
 		position_measures = self.get_active_agents_positions_dict().values()
 
-		# Take the sample and add noise, saturate between 0 and 1 with clip#
+		# Take the sample and add noise, saturating between 0 and 1 #
 		noisy_measures = np.clip([ground_truth[pose[0], pose[1]] + np.random.normal(self.mean_sensormeasure[idx], self.std_sensormeasure[idx]) for idx, pose in self.get_active_agents_positions_dict().items()], 0, 1)
 
 		# Variance associated to the measures #
@@ -488,6 +494,13 @@ class MultiAgentMonitoring:
 
 	def step(self, actions: dict):
 		"""Execute all updates for each step"""
+
+		# Update the map of visited areas #
+		for agent_id, pose in self.get_active_agents_positions_dict().items():
+			x_grid, y_grid = np.meshgrid(np.arange(pose[0] - 1, pose[0] + 2), np.arange(pose[1] - 1, pose[1] + 2))
+			for x, y in zip(x_grid.flatten(), y_grid.flatten()):
+				if (self.visited_map[x, y] == 0 or self.visited_map[x, y] > self.std_sensormeasure[agent_id]) and (np.any(np.all(self.visitable_locations == [x,y], axis=1))): # save best agent std visited
+					self.visited_map[x, y] = self.std_sensormeasure[agent_id]
 
 		# Update ground truth if dynamic #
 		if self.dynamic:
@@ -564,6 +577,7 @@ class MultiAgentMonitoring:
 					obstacle_map[np.newaxis], # Channel 0 -> Known boundaries/map
 					self.model_mean_map[np.newaxis], # Channel 1 -> Model mean map
 					self.model_uncertainty_map[np.newaxis], # Channel 2 -> Model uncertainty map
+					# self.visited_map[np.newaxis], # Channel 2 -> Visited map with best std
 					observing_agent_position[np.newaxis], # Channel 3 -> Observing agent position map
 					agent_observation_of_fleet[np.newaxis], # Channel 4 -> Others active agents position map
 				))
@@ -758,15 +772,26 @@ class MultiAgentMonitoring:
 						]
 					)
 			
+			extra_reward = np.zeros(self.n_agents)
+
 			ponderation_by_measure_importance = True
 			if ponderation_by_measure_importance:
 				measures = self.new_measures.copy()
-				for id, value in self.done.items():
-					if value:
+				for id, dead in self.done.items():
+					if dead:
 						measures = np.insert(measures, id, 0)
-				rewards = self.reward_weights[0] * changes_mean + 5*measures + self.reward_weights[1] * changes_uncertinty
-			else:	
-				rewards = self.reward_weights[0] * changes_mean + self.reward_weights[1] * changes_uncertinty
+				extra_reward += 10*measures#*self.scaled_std_sensormeasure
+			
+			penalization_visited_areas = False
+			if penalization_visited_areas:
+				penalization = np.zeros(self.n_agents)
+				for agent_id, pose in self.get_active_agents_positions_dict().items():
+					area = self.visited_map[pose[0] - 1:pose[0] + 2, pose[1] - 1:pose[1] + 2]
+					for x, y in np.argwhere((area !=0) & (area < self.std_sensormeasure[agent_id])):
+						penalization[agent_id] += 1 - area[x, y] / self.std_sensormeasure[agent_id] # penalize more if std is lower
+				extra_reward -= penalization
+
+			rewards = self.reward_weights[0] * changes_mean + self.reward_weights[1] * changes_uncertinty + extra_reward
 		
 		elif self.reward_function == 'Error_with_model':
 

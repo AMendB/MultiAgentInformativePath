@@ -433,7 +433,10 @@ if __name__ == '__main__':
         # 'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Error_10_0/',  ##
         # 'DoneTrainings/entry_not_normalized_var_runs4A/Alg_Network_RW_Influence_10_0/',  ##
         # 'DoneTrainings/entry_std_sensor_runs_4A/Alg_Network_RW_Influence_10_0/',  ##
-        'DoneTrainings/01_12_2023/Alg_Network_RW_Influence_10_0/',  ##
+        # 'DoneTrainings/01_12_2023/Alg_Network_RW_Influence_10_0/',  ##
+        # 'DoneTrainings/04_12_2023/Alg_Network_RW_Influence_10_0/',  ##
+        # 'DoneTrainings/04_12_2023/Alg_Network_RW_Influence_10_5/',  ##
+        'DoneTrainings/05_12_2023/Alg_Network_RW_x10Influence_10_0/',  ##
         ]
 
     SHOW_FINAL_PLOT_GRAPHICS = False
