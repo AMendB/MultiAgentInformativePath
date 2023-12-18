@@ -20,6 +20,8 @@ class GroundTruth(object):
         self.max_number_of_peaks = 6 if max_number_of_peaks is None else max_number_of_peaks
         self.seed = seed
         self.rng = np.random.default_rng(seed=self.seed) # random number generator, it's better than set a np.random.seed() (https://builtin.com/data-science/numpy-random-seed)
+        self.rng_seed_for_steps = np.random.default_rng(seed=self.seed+1)
+        self.rng_steps = np.random.default_rng(seed=self.rng_seed_for_steps.integers(0, 1000000))
         self.peaks_location = peaks_location
 
         """ random map features creation """
@@ -86,6 +88,8 @@ class GroundTruth(object):
         self.C = 10*(self.rng.random((self.number_of_peaks, 1)) + 0.5)
         # Reconstruct the field #
         self.create_field()
+        # New seed for steps #
+        self.rng_steps = np.random.default_rng(seed=self.rng_seed_for_steps.integers(0, 1000000))
 
     def read(self, position=None):
 
@@ -110,7 +114,7 @@ class GroundTruth(object):
     def step(self):
         """ Move every maximum with a random walk noise """
 
-        self.A += self.dt*(2*(self.rng.random(*self.A.shape)-0.5) * self.xy_size * 0.9 + self.xy_size*0.1)
+        self.A += self.dt*(2*(self.rng_steps.random([*self.A.shape])-0.5) * self.xy_size * 0.9 + self.xy_size*0.1)
         # self.A += self.dt*(2*(np.random.rand(*self.A.shape)-0.5) * self.xy_size * 0.9 + self.xy_size*0.1)
         self.create_field()
 

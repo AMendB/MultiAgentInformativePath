@@ -11,7 +11,7 @@ class WanderingAgent:
         self.t = 0
         self.action = None
         self.seed = seed
-        np.random.seed(self.seed)
+        self.rng = np.random.default_rng(seed=self.seed)
     
     def move(self, actual_position):
 
@@ -63,6 +63,7 @@ class WanderingAgent:
         if self.action is not None:
             opposite_action = self.opposite_action(self.action)
             action_caused_collision[opposite_action] = True
-        action = np.random.choice(np.where(np.logical_not(action_caused_collision))[0])
+        action = self.rng.choice(np.where(np.logical_not(action_caused_collision))[0])
+        # action = np.random.choice(np.where(np.logical_not(action_caused_collision))[0])
 
         return action

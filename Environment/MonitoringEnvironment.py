@@ -351,8 +351,8 @@ class MultiAgentMonitoring:
 		# Info for training # 
 		self.observation_space_shape = (5, *self.scenario_map.shape)
 
-		# Map of visited areas #
-		self.visited_map = np.zeros_like(self.scenario_map)
+		# Map of knowledge #
+		self.knowledge_map = np.zeros_like(self.scenario_map)
 		
 	def set_agents_specs(self, init=False, reset=False):
 
@@ -450,8 +450,8 @@ class MultiAgentMonitoring:
 			plt.close(self.render_fig)
 			self.render_fig = None
 		
-		# Map of visited areas #
-		self.visited_map = np.zeros_like(self.scenario_map)
+		# Map of knowledge #
+		self.knowledge_map = np.zeros_like(self.scenario_map)
 
 		return self.states
 
@@ -495,12 +495,10 @@ class MultiAgentMonitoring:
 	def step(self, actions: dict):
 		"""Execute all updates for each step"""
 
-		# Update the map of visited areas #
-		for agent_id, pose in self.get_active_agents_positions_dict().items():
-			x_grid, y_grid = np.meshgrid(np.arange(pose[0] - 1, pose[0] + 2), np.arange(pose[1] - 1, pose[1] + 2))
-			for x, y in zip(x_grid.flatten(), y_grid.flatten()):
-				if (self.visited_map[x, y] == 0 or self.visited_map[x, y] > self.std_sensormeasure[agent_id]) and (np.any(np.all(self.visitable_locations == [x,y], axis=1))): # save best agent std visited
-					self.visited_map[x, y] = self.std_sensormeasure[agent_id]
+		# Update the map of knowledge #
+		for agent_id, (x, y) in self.get_active_agents_positions_dict().items():
+			if (self.knowledge_map[x, y] < self.scaled_std_sensormeasure[agent_id]): # save best agent std visited
+				self.knowledge_map[x, y] = self.scaled_std_sensormeasure[agent_id]
 
 		# Update ground truth if dynamic #
 		if self.dynamic:
@@ -576,8 +574,8 @@ class MultiAgentMonitoring:
 				states[agent_id] = np.concatenate(( 
 					obstacle_map[np.newaxis], # Channel 0 -> Known boundaries/map
 					self.model_mean_map[np.newaxis], # Channel 1 -> Model mean map
-					self.model_uncertainty_map[np.newaxis], # Channel 2 -> Model uncertainty map
-					# self.visited_map[np.newaxis], # Channel 2 -> Visited map with best std
+					# self.model_uncertainty_map[np.newaxis], # Channel 2 -> Model uncertainty map
+					self.knowledge_map[np.newaxis], # Channel 2 -> Knowledge map with best scaled std
 					observing_agent_position[np.newaxis], # Channel 3 -> Observing agent position map
 					agent_observation_of_fleet[np.newaxis], # Channel 4 -> Others active agents position map
 				))
@@ -780,16 +778,35 @@ class MultiAgentMonitoring:
 				for id, dead in self.done.items():
 					if dead:
 						measures = np.insert(measures, id, 0)
-				extra_reward += 10*measures#*self.scaled_std_sensormeasure
+				ponderation_by_knowledge = True
+				if ponderation_by_knowledge:
+					x, y = self.fleet.fleet_positions[:,0], self.fleet.fleet_positions[:,1]
+
+					values_in_position = self.knowledge_map[x,y]
+
+					# Create an index to access the neighborhood around each pixel
+					rows, cols = np.meshgrid(np.arange(-1, 2), np.arange(-1, 2), indexing='ij')
+
+					# Calculate the coordinates of the neighborhood for each position
+					neighborhood_x = x[:, None, None] + rows
+					neighborhood_y = y[:, None, None] + cols
+
+					# Calculate the mean of the 3 best neighbors for each position
+					neighborhood_values = self.knowledge_map[neighborhood_x, neighborhood_y].reshape(self.n_agents,-1)
+					top_three_mean = np.mean(np.sort(neighborhood_values, axis=-1)[:, -3:], axis=-1)
+
+					# If the value in the position is 0, use the mean of the neighbourhood instead. Values are inversed to ponderate.
+					uncertainty_ponderation = 1 - np.where(values_in_position == 0, top_three_mean, values_in_position)
+				extra_reward += 50*measures*uncertainty_ponderation#*self.scaled_std_sensormeasure#
 			
-			penalization_visited_areas = False
-			if penalization_visited_areas:
-				penalization = np.zeros(self.n_agents)
-				for agent_id, pose in self.get_active_agents_positions_dict().items():
-					area = self.visited_map[pose[0] - 1:pose[0] + 2, pose[1] - 1:pose[1] + 2]
-					for x, y in np.argwhere((area !=0) & (area < self.std_sensormeasure[agent_id])):
-						penalization[agent_id] += 1 - area[x, y] / self.std_sensormeasure[agent_id] # penalize more if std is lower
-				extra_reward -= penalization
+			# penalization_visited_areas = False
+			# if penalization_visited_areas:
+			# 	penalization = np.zeros(self.n_agents)
+			# 	for agent_id, pose in self.get_active_agents_positions_dict().items():
+			# 		area = self.visited_map[pose[0] - 1:pose[0] + 2, pose[1] - 1:pose[1] + 2]
+			# 		for x, y in np.argwhere((area !=0) & (area < self.std_sensormeasure[agent_id])):
+			# 			penalization[agent_id] += 1 - area[x, y] / self.std_sensormeasure[agent_id] # penalize more if std is lower
+			# 	extra_reward -= penalization
 
 			rewards = self.reward_weights[0] * changes_mean + self.reward_weights[1] * changes_uncertinty + extra_reward
 		
@@ -821,7 +838,6 @@ class MultiAgentMonitoring:
 		rewards = {agent_id: rewards[agent_id]/cost[agent_id] if not collisions_mask_dict[agent_id] else -1.0 for agent_id in actions.keys()} # save calculated agent reward/cost, penalization if collision
 
 		return {agent_id: rewards[agent_id] if self.active_agents[agent_id] else 0 for agent_id in range(self.n_agents)}
-	
 	
 	def get_active_agents_positions_dict(self):
 
@@ -859,6 +875,19 @@ class MultiAgentMonitoring:
 			model_mu_in_peaks = model_mu_in_visitable_locations[peaks_mask]
 
 			return mean_squared_error(y_true=gt_in_peaks, y_pred=model_mu_in_peaks, sample_weight=gt_in_peaks, squared=squared)
+
+	def get_model_mu_mse_error_in_non_peaks(self, squared = False):
+			""" Returns the MSE error in non peaks of the ground truth """
+
+			gt_in_visitable_locations = self.get_gt_in_visitable_locations()
+			model_mu_in_visitable_locations = self.get_model_mu_in_visitable_locations()
+			
+			non_peaks_mask = np.where(self.get_gt_in_visitable_locations() < 0.9, True, False)
+
+			gt_in_non_peaks = gt_in_visitable_locations[non_peaks_mask]
+			model_mu_in_non_peaks = model_mu_in_visitable_locations[non_peaks_mask]
+
+			return mean_squared_error(y_true=gt_in_non_peaks, y_pred=model_mu_in_non_peaks, sample_weight=gt_in_non_peaks, squared=squared)
 
 	def get_model_mu_r2_error(self):
 			""" Returns the R2 error """
@@ -914,7 +943,7 @@ if __name__ == '__main__':
 
 	from Algorithms.DRL.ActionMasking.ActionMaskingUtils import ConsensusSafeActionMasking
 	
-	seed = 3
+	seed = 24
 	np.random.seed(seed)
 	scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
 	# scenario_map = np.genfromtxt('Environment/Maps/ypacarai_lake_58x41.csv', delimiter=',')

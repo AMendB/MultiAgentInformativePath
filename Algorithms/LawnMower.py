@@ -13,7 +13,7 @@ class LawnMowerAgent:
         self.turn_count = 0
         self.initial_action = forward_direction
         self.seed = seed
-        np.random.seed(seed)
+        self.rng = np.random.default_rng(seed=self.seed)
 
     
     def compute_obstacles(self, position):
