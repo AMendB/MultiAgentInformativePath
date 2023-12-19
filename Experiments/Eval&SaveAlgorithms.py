@@ -275,6 +275,7 @@ class AlgorithmRecorderAndAnalizer:
             self.reward_steps = [0]
             self.mse = [self.env.get_model_mu_mse_error()]
             self.mse_peaks = [self.env.get_model_mu_mse_error_in_peaks()]
+            self.mse_non_peaks = [self.env.get_model_mu_mse_error_in_non_peaks()]
             self.error_r2 = [self.env.get_model_mu_r2_error()]
             self.uncert_mean = [self.env.get_uncertainty_mean()]
             self.uncert_max = [self.env.get_uncertainty_max()]
@@ -289,6 +290,7 @@ class AlgorithmRecorderAndAnalizer:
             self.reward_steps.append(np.sum(list(new_reward.values())))
             self.mse.append(self.env.get_model_mu_mse_error())
             self.mse_peaks.append(self.env.get_model_mu_mse_error_in_peaks())
+            self.mse_non_peaks.append(self.env.get_model_mu_mse_error_in_non_peaks())
             self.error_r2.append(self.env.get_model_mu_r2_error())
             self.uncert_mean.append(self.env.get_uncertainty_mean())
             self.uncert_max.append(self.env.get_uncertainty_max())
@@ -303,9 +305,9 @@ class AlgorithmRecorderAndAnalizer:
 
         # Save metrics #
         if self.n_agents > 1:
-            data = [*self.reward_agents_acc[-1], self.reward_acc[-1], self.mse[-1], self.mse_peaks[-1], self.error_r2[-1], self.uncert_mean[-1], self.uncert_max[-1], self.traveled_distance[-1], self.max_redundancy[-1], *self.traveled_distance_agents[-1], *self.distances_between_agents[-1]]
+            data = [*self.reward_agents_acc[-1], self.reward_acc[-1], self.mse[-1], self.mse_peaks[-1], self.mse_non_peaks[-1], self.error_r2[-1], self.uncert_mean[-1], self.uncert_max[-1], self.traveled_distance[-1], self.max_redundancy[-1], *self.traveled_distance_agents[-1], *self.distances_between_agents[-1]]
         else:
-            data = [*self.reward_agents_acc[-1], self.reward_acc[-1], self.mse[-1], self.mse_peaks[-1], self.error_r2[-1], self.uncert_mean[-1], self.uncert_max[-1], self.traveled_distance[-1], self.max_redundancy[-1], *self.traveled_distance_agents[-1]]
+            data = [*self.reward_agents_acc[-1], self.reward_acc[-1], self.mse[-1], self.mse_peaks[-1], self.mse_non_peaks[-1], self.error_r2[-1], self.uncert_mean[-1], self.uncert_max[-1], self.traveled_distance[-1], self.max_redundancy[-1], *self.traveled_distance_agents[-1]]
         metrics.save_step(run_num=run, step=step, metrics=data)
 
         # Save waypoints #
@@ -338,6 +340,7 @@ class AlgorithmRecorderAndAnalizer:
         self.mse = self.results_mean['MSE'].values.tolist()
         self.mse_std = self.results_std['MSE'].values.tolist()
         self.mse_peaks = self.results_mean['MSE_peaks'].values.tolist()
+        self.mse_non_peaks = self.results_mean['MSE_non_peaks'].values.tolist()
         self.error_r2 = self.results_mean['R2_error'].values.tolist()
         self.uncert_mean = self.results_mean['Uncert_mean'].values.tolist()
         self.uncert_max = self.results_mean['Uncert_max'].values.tolist()
@@ -373,6 +376,9 @@ class AlgorithmRecorderAndAnalizer:
         mse_peaks_33 = []
         mse_peaks_66 = []
         mse_peaks_100 = []
+        mse_non_peaks_33 = []
+        mse_non_peaks_66 = []
+        mse_non_peaks_100 = []
         for episode in self.runs:
             mse_episode = np.array(numeric_columns[numeric_columns['Run']==episode]['MSE'])
             mse_33.append(mse_episode[round(len(mse_episode)*0.33)])
@@ -382,8 +388,13 @@ class AlgorithmRecorderAndAnalizer:
             mse_peaks_33.append(msepeaks_episode[round(len(msepeaks_episode)*0.33)])
             mse_peaks_66.append(msepeaks_episode[round(len(msepeaks_episode)*0.66)])
             mse_peaks_100.append(msepeaks_episode[-1])
+            msenonpeaks_episode = np.array(numeric_columns[numeric_columns['Run']==episode]['MSE_non_peaks'])
+            mse_non_peaks_33.append(msenonpeaks_episode[round(len(msenonpeaks_episode)*0.33)])
+            mse_non_peaks_66.append(msenonpeaks_episode[round(len(msenonpeaks_episode)*0.66)])
+            mse_non_peaks_100.append(msenonpeaks_episode[-1])
         table.loc['MSE-'+name_rw, name_alg] = [np.mean(mse_33), np.std(mse_33), np.mean(mse_66), np.std(mse_66), np.mean(mse_100), np.std(mse_100)]
         table.loc['MSEpeaks-'+name_rw, name_alg] = [np.mean(mse_peaks_33), np.std(mse_peaks_33), np.mean(mse_peaks_66), np.std(mse_peaks_66), np.mean(mse_peaks_100), np.std(mse_peaks_100)]
+        table.loc['MSEnonpeaks-'+name_rw, name_alg] = [np.mean(mse_non_peaks_33), np.std(mse_non_peaks_33), np.mean(mse_non_peaks_66), np.std(mse_non_peaks_66), np.mean(mse_non_peaks_100), np.std(mse_non_peaks_100)]
 
 
         # To do WILCOXON TEST, extract the MSE vector of len(vector)=runs from df at steps 33%, 66% and 100% of min_steps=48 for each episode #
@@ -442,11 +453,12 @@ if __name__ == '__main__':
         # 'DoneTrainings/entry_not_normalized_var_runs4A/Alg_Network_RW_Influence_10_0/',  ##
         # 'DoneTrainings/entry_std_sensor_runs_4A/Alg_Network_RW_Influence_10_0/',  ##
         # 'DoneTrainings/01_12_2023/Alg_Network_RW_x50Influence_10_0/',  ##
-        # 'DoneTrainings/04_12_2023/Alg_Network_RW_x5Influence_10_0/',  ##
+        'DoneTrainings/04_12_2023/Alg_Network_RW_x5Influence_10_0/',  ##
+        # 'DoneTrainings/04_12_2023/Alg_Network_RW_x5Influence_10_5/',  ##
         # 'DoneTrainings/05_12_2023/Alg_Network_RW_x10Influence_10_0/',  ##
         # 'DoneTrainings/13_12_2023/Alg_Network_RW_x20Influence_10_0/',  ##
         # 'DoneTrainings/15_12_2023/Alg_Network_RW_x10xstdInfluence_10_0/',  ##
-        'DoneTrainings/15_12_2023/Alg_Network_RW_x25xstdInfluence_10_0/',  ##
+        # 'DoneTrainings/15_12_2023/Alg_Network_RW_x25xstdInfluence_10_0/',  ##
         ]
 
     SHOW_FINAL_PLOT_GRAPHICS = False
@@ -615,10 +627,10 @@ if __name__ == '__main__':
 
                     # Initialize metrics saving class #
                     if n_agents > 1:
-                        metrics_names = [*[f'AccRw{id}' for id in range(n_agents)], 'R_acc', 'MSE', 'MSE_peaks', 'R2_error', 'Uncert_mean', 'Uncert_max',
+                        metrics_names = [*[f'AccRw{id}' for id in range(n_agents)], 'R_acc', 'MSE', 'MSE_peaks', 'MSE_non_peaks', 'R2_error', 'Uncert_mean', 'Uncert_max',
                                         'Traveled_distance', 'Max_Redundancy', *[f'TravelDist{id}' for id in range(n_agents)], *env.fleet.get_distances_between_agents().keys()]
                     else:
-                        metrics_names = [*[f'AccRw{id}' for id in range(n_agents)], 'R_acc', 'MSE', 'MSE_peaks', 'R2_error', 'Uncert_mean', 'Uncert_max',
+                        metrics_names = [*[f'AccRw{id}' for id in range(n_agents)], 'R_acc', 'MSE', 'MSE_peaks', 'MSE_non_peaks', 'R2_error', 'Uncert_mean', 'Uncert_max',
                                         'Traveled_distance', 'Max_Redundancy', *[f'TravelDist{id}' for id in range(n_agents)]]
                     metrics = MetricsDataCreator(metrics_names=metrics_names,
                                                 algorithm_name=selected_algorithm + '.' + str(n_agents) + '.' + reward_function + '.' + '_'.join(map(str, reward_weights)),

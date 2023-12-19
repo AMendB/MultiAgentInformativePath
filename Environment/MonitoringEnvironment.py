@@ -574,8 +574,8 @@ class MultiAgentMonitoring:
 				states[agent_id] = np.concatenate(( 
 					obstacle_map[np.newaxis], # Channel 0 -> Known boundaries/map
 					self.model_mean_map[np.newaxis], # Channel 1 -> Model mean map
-					# self.model_uncertainty_map[np.newaxis], # Channel 2 -> Model uncertainty map
-					self.knowledge_map[np.newaxis], # Channel 2 -> Knowledge map with best scaled std
+					self.model_uncertainty_map[np.newaxis], # Channel 2 -> Model uncertainty map
+					# self.knowledge_map[np.newaxis], # Channel 2 -> Knowledge map with best scaled std
 					observing_agent_position[np.newaxis], # Channel 3 -> Observing agent position map
 					agent_observation_of_fleet[np.newaxis], # Channel 4 -> Others active agents position map
 				))
@@ -797,7 +797,13 @@ class MultiAgentMonitoring:
 
 					# If the value in the position is 0, use the mean of the neighbourhood instead. Values are inversed to ponderate.
 					uncertainty_ponderation = 1 - np.where(values_in_position == 0, top_three_mean, values_in_position)
-				extra_reward += 50*measures*uncertainty_ponderation#*self.scaled_std_sensormeasure#
+					
+					# If the agent is better than a previous knowledge
+					for n in range(self.n_agents):
+						if uncertainty_ponderation[n] !=0 and (1 - uncertainty_ponderation[n]) < self.scaled_std_sensormeasure[n]:
+							uncertainty_ponderation[n] = 0.25 + (self.scaled_std_sensormeasure[n] - (1-uncertainty_ponderation[n]))
+				
+				extra_reward += 25*measures*uncertainty_ponderation#*self.scaled_std_sensormeasure###
 			
 			# penalization_visited_areas = False
 			# if penalization_visited_areas:
