@@ -453,12 +453,16 @@ if __name__ == '__main__':
         # 'DoneTrainings/entry_not_normalized_var_runs4A/Alg_Network_RW_Influence_10_0/',  ##
         # 'DoneTrainings/entry_std_sensor_runs_4A/Alg_Network_RW_Influence_10_0/',  ##
         # 'DoneTrainings/01_12_2023/Alg_Network_RW_x50Influence_10_0/',  ##
-        'DoneTrainings/04_12_2023/Alg_Network_RW_x5Influence_10_0/',  ##
+        # 'DoneTrainings/04_12_2023/Alg_Network_RW_x5Influence_10_0/',  ##
         # 'DoneTrainings/04_12_2023/Alg_Network_RW_x5Influence_10_5/',  ##
         # 'DoneTrainings/05_12_2023/Alg_Network_RW_x10Influence_10_0/',  ##
         # 'DoneTrainings/13_12_2023/Alg_Network_RW_x20Influence_10_0/',  ##
         # 'DoneTrainings/15_12_2023/Alg_Network_RW_x10xstdInfluence_10_0/',  ##
         # 'DoneTrainings/15_12_2023/Alg_Network_RW_x25xstdInfluence_10_0/',  ##
+        # 'DoneTrainings/19_12_2023/Alg_Network_RW_x25xknowInfluence_10_0/',  ##
+        # 'DoneTrainings/19_12_2023/Alg_Network_RW_x50xknowInfluence_10_0/',  ##
+        # 'DoneTrainings/21_12_2023/Alg_Network_RW_x25ximprovInfluence_10_0/',  ##
+        'DoneTrainings/21_12_2023/Alg_Network_RW_x50ximprovInfluence_10_0/',  ##
         ]
 
     SHOW_FINAL_PLOT_GRAPHICS = False

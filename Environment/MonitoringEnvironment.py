@@ -475,10 +475,10 @@ class MultiAgentMonitoring:
 	def update_model(self):
 
 		# Sensor samples #
-		position_new_measures, self.new_measures, variance_of_measures = self.take_samples()
+		self.position_new_measures, self.new_measures, variance_of_measures = self.take_samples()
 		
 		# Fit gaussian process with new samples #
-		self.gaussian_process.fit_gp(X_new=position_new_measures, y_new=self.new_measures, variances_new=variance_of_measures)
+		self.gaussian_process.fit_gp(X_new=self.position_new_measures, y_new=self.new_measures, variances_new=variance_of_measures)
 		
 		# Update model: prediction of ground truth #
 		self.previous_model_mean_map = self.model_mean_map.copy()
@@ -775,9 +775,12 @@ class MultiAgentMonitoring:
 			ponderation_by_measure_importance = True
 			if ponderation_by_measure_importance:
 				measures = self.new_measures.copy()
+				# measures = self.model_mean_map[np.array([*self.position_new_measures])[:,0], np.array([*self.position_new_measures])[:,1]]
 				for id, dead in self.done.items():
 					if dead:
 						measures = np.insert(measures, id, 0)
+				# measures = np.where(measures > 0.5, measures, 0)
+
 				ponderation_by_knowledge = True
 				if ponderation_by_knowledge:
 					x, y = self.fleet.fleet_positions[:,0], self.fleet.fleet_positions[:,1]
@@ -798,12 +801,11 @@ class MultiAgentMonitoring:
 					# If the value in the position is 0, use the mean of the neighbourhood instead. Values are inversed to ponderate.
 					uncertainty_ponderation = 1 - np.where(values_in_position == 0, top_three_mean, values_in_position)
 					
-					# If the agent is better than a previous knowledge
-					for n in range(self.n_agents):
-						if uncertainty_ponderation[n] !=0 and (1 - uncertainty_ponderation[n]) < self.scaled_std_sensormeasure[n]:
-							uncertainty_ponderation[n] = 0.25 + (self.scaled_std_sensormeasure[n] - (1-uncertainty_ponderation[n]))
+					# If the agent is better than a previous knowledge (improved measure)
+					condition = (1 - uncertainty_ponderation != 0) & ((1 - uncertainty_ponderation) < self.scaled_std_sensormeasure)
+					uncertainty_ponderation = np.where(condition, np.clip(0.25 + (self.scaled_std_sensormeasure - (1 - uncertainty_ponderation)), 0, 1), uncertainty_ponderation)
 				
-				extra_reward += 25*measures*uncertainty_ponderation#*self.scaled_std_sensormeasure###
+				extra_reward += 50*measures*uncertainty_ponderation#*self.scaled_std_sensormeasure###
 			
 			# penalization_visited_areas = False
 			# if penalization_visited_areas:
@@ -875,7 +877,7 @@ class MultiAgentMonitoring:
 			gt_in_visitable_locations = self.get_gt_in_visitable_locations()
 			model_mu_in_visitable_locations = self.get_model_mu_in_visitable_locations()
 			
-			peaks_mask = np.where(self.get_gt_in_visitable_locations() > 0.9, True, False)
+			peaks_mask = np.where(self.get_gt_in_visitable_locations() >= 0.9, True, False)
 
 			gt_in_peaks = gt_in_visitable_locations[peaks_mask]
 			model_mu_in_peaks = model_mu_in_visitable_locations[peaks_mask]
