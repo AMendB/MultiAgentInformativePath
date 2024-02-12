@@ -147,6 +147,7 @@ class AlgorithmRecorderAndAnalizer:
         # Save figure #
         plt.suptitle(f"{self.algorithm.split('_')[0]} | {self.reward_funct.split('_')[0]}_{'_'.join(map(str, self.reward_weights))} | EP{run}", ha='center')
         plt.savefig(fname=f"{self.relative_path}/Models/Ep{run}.png")
+        plt.savefig(fname=f"{self.relative_path}/Models_svg/Ep{run}.svg")
         plt.close()
 
     def plot_paths(self, run = None, save_plot = False):
@@ -168,6 +169,7 @@ class AlgorithmRecorderAndAnalizer:
         if save_plot:
             plt.title(f"{self.algorithm.split('_')[0]} | {self.reward_funct.split('_')[0]}_{'_'.join(map(str, self.reward_weights))} | EP{run}", fontsize='medium')
             plt.savefig(fname=f"{self.relative_path}/Paths/Ep{run}.png")
+            plt.savefig(fname=f"{self.relative_path}/Paths_svg/Ep{run}.svg")
             plt.close()
         else:
             plt.title(f"Real Importance (GT) with agents path, EP {run}")
@@ -240,6 +242,7 @@ class AlgorithmRecorderAndAnalizer:
 
             if save_plot:
                 fig.savefig(fname=f"{self.relative_path}/AverageMetrics_{len(self.runs)}eps.png")
+                fig.savefig(fname=f"{self.relative_path}/AverageMetrics_{len(self.runs)}eps.svg")
 
             if show_plot:
                 plt.show()
@@ -321,18 +324,22 @@ class AlgorithmRecorderAndAnalizer:
         np.save( self.relative_path + output_filename , self.scenario_map)
     
     def plot_and_tables_metrics_average(self, metrics_path, table, wilcoxon_dict, show_plot = True , save_plot = False):
-        
+ 
         metrics_df = MetricsDataCreator.load_csv_as_df(metrics_path)
         self.runs = metrics_df['Run'].unique()
 
         numeric_columns = metrics_df.select_dtypes(include=[np.number])
-        self.results_mean = numeric_columns.groupby('Step').agg('mean')
-        self.results_std = numeric_columns.groupby('Step').agg('std')
 
-        # Num steps limited so all episodes have the same lenght #
-        min_steps = 48
-        self.results_mean = self.results_mean.head(min_steps)  
-        self.results_std = self.results_std.head(min_steps)  
+        # For all episodes to have the same length, df will be extended by repeating the last values up to max_steps lenght #
+        max_steps = 51
+        padded_df = numeric_columns.groupby('Run', group_keys=False).apply(lambda group: group.set_index('Step').reindex(range(max_steps)).fillna(method='ffill')).reset_index().astype({'Run': int})
+        self.results_mean = padded_df.groupby('Step').agg('mean')
+        self.results_std = padded_df.groupby('Step').agg('std')
+
+        self.results_mean = self.results_mean.reindex(range(max_steps), method='ffill')
+        self.results_std = self.results_std.reindex(range(max_steps), method='ffill')
+        # self.results_mean = self.results_mean.head(min_steps)  
+        # self.results_std = self.results_std.head(min_steps)  
 
         first_accreward_agent_index = self.results_mean.columns.get_loc('AccRw0')
         self.reward_agents_acc = self.results_mean.iloc[:, first_accreward_agent_index:first_accreward_agent_index + self.n_agents].values.tolist()
@@ -365,11 +372,12 @@ class AlgorithmRecorderAndAnalizer:
 
         if not name_alg.capitalize() in table:
             new_df = pd.DataFrame(
-                    columns=pd.MultiIndex.from_product([[name_alg], ["Mean33", "Std33", "Mean66", "Std66", "Mean100", "Std100"]]),
+                    # columns=pd.MultiIndex.from_product([[name_alg], ["Mean33", "Std33", "Mean66", "Std66", "Mean100", "Std100"]]),
+                    columns=pd.MultiIndex.from_product([[name_alg], ["Mean33", "CI33 95%", "Mean66", "CI66 95%", "Mean100", "CI100 95%"]]),
                     index=table.index)
             table = pd.concat([table, new_df], axis=1)
 
-        # Calculate the real mse at 33%, 66% and 100% of each episode, without aproximation at step min_steps, and add to table #
+        # Calculate the real mse at 33%, 66% and 100% of each episode and add to table #
         mse_33 = []
         mse_66 = []
         mse_100 = []
@@ -379,6 +387,10 @@ class AlgorithmRecorderAndAnalizer:
         mse_non_peaks_33 = []
         mse_non_peaks_66 = []
         mse_non_peaks_100 = []
+        r2_33 = []
+        r2_66 = []
+        r2_100 = []
+        accumulated_mse = []
         for episode in self.runs:
             mse_episode = np.array(numeric_columns[numeric_columns['Run']==episode]['MSE'])
             mse_33.append(mse_episode[round(len(mse_episode)*0.33)])
@@ -392,12 +404,26 @@ class AlgorithmRecorderAndAnalizer:
             mse_non_peaks_33.append(msenonpeaks_episode[round(len(msenonpeaks_episode)*0.33)])
             mse_non_peaks_66.append(msenonpeaks_episode[round(len(msenonpeaks_episode)*0.66)])
             mse_non_peaks_100.append(msenonpeaks_episode[-1])
-        table.loc['MSE-'+name_rw, name_alg] = [np.mean(mse_33), np.std(mse_33), np.mean(mse_66), np.std(mse_66), np.mean(mse_100), np.std(mse_100)]
-        table.loc['MSEpeaks-'+name_rw, name_alg] = [np.mean(mse_peaks_33), np.std(mse_peaks_33), np.mean(mse_peaks_66), np.std(mse_peaks_66), np.mean(mse_peaks_100), np.std(mse_peaks_100)]
-        table.loc['MSEnonpeaks-'+name_rw, name_alg] = [np.mean(mse_non_peaks_33), np.std(mse_non_peaks_33), np.mean(mse_non_peaks_66), np.std(mse_non_peaks_66), np.mean(mse_non_peaks_100), np.std(mse_non_peaks_100)]
+            r2_episode = np.array(numeric_columns[numeric_columns['Run']==episode]['R2_error'])
+            r2_33.append(r2_episode[round(len(r2_episode)*0.33)])
+            r2_66.append(r2_episode[round(len(r2_episode)*0.66)])
+            r2_100.append(r2_episode[-1])
+            accumulated_mse.append(np.sum(padded_df[padded_df['Run']==episode]['MSE']))
+        # table.loc['MSE-'+name_rw, name_alg] = [np.mean(mse_33), np.std(mse_33), np.mean(mse_66), np.std(mse_66), np.mean(mse_100), np.std(mse_100)]
+        # table.loc['MSEpeaks-'+name_rw, name_alg] = [np.mean(mse_peaks_33), np.std(mse_peaks_33), np.mean(mse_peaks_66), np.std(mse_peaks_66), np.mean(mse_peaks_100), np.std(mse_peaks_100)]
+        # table.loc['MSEnonpeaks-'+name_rw, name_alg] = [np.mean(mse_non_peaks_33), np.std(mse_non_peaks_33), np.mean(mse_non_peaks_66), np.std(mse_non_peaks_66), np.mean(mse_non_peaks_100), np.std(mse_non_peaks_100)]
+        # table.loc['R2-'+name_rw, name_alg] = [np.mean(r2_33), np.std(r2_33), np.mean(r2_66), np.std(r2_66), np.mean(r2_100), np.std(r2_100)]
+        # table.loc['AccumulatedMSE-'+name_rw, name_alg] = ['-', '-', '-', '-', np.mean(accumulated_mse), np.std(accumulated_mse)]
+        table.loc['MSE-'+name_rw, name_alg] = [np.mean(mse_33), 1.96*np.std(mse_33)/np.sqrt(len(self.runs)), np.mean(mse_66),1.96*np.std(mse_66)/np.sqrt(len(self.runs)), np.mean(mse_100), 1.96*np.std(mse_100)/np.sqrt(len(self.runs))]
+        table.loc['MSEpeaks-'+name_rw, name_alg] = [np.mean(mse_peaks_33), 1.96*np.std(mse_peaks_33)/np.sqrt(len(self.runs)), np.mean(mse_peaks_66), 1.96*np.std(mse_peaks_66)/np.sqrt(len(self.runs)), np.mean(mse_peaks_100), 1.96*np.std(mse_peaks_100)/np.sqrt(len(self.runs))]
+        table.loc['MSEnonpeaks-'+name_rw, name_alg] = [np.mean(mse_non_peaks_33), 1.96*np.std(mse_non_peaks_33)/np.sqrt(len(self.runs)), np.mean(mse_non_peaks_66), 1.96*np.std(mse_non_peaks_66)/np.sqrt(len(self.runs)), np.mean(mse_non_peaks_100), 1.96*np.std(mse_non_peaks_100)/np.sqrt(len(self.runs))]
+        table.loc['R2-'+name_rw, name_alg] = [np.mean(r2_33), 1.96*np.std(r2_33)/np.sqrt(len(self.runs)), np.mean(r2_66), 1.96*np.std(r2_66)/np.sqrt(len(self.runs)), np.mean(r2_100), 1.96*np.std(r2_100)/np.sqrt(len(self.runs))]
+        table.loc['AccumulatedMSE-'+name_rw, name_alg] = ['-', '-', '-', '-', np.mean(accumulated_mse), 1.96*np.std(accumulated_mse)/np.sqrt(len(self.runs))]
+        
 
 
         # To do WILCOXON TEST, extract the MSE vector of len(vector)=runs from df at steps 33%, 66% and 100% of min_steps=48 for each episode #
+        min_steps = 48
         series_33 = numeric_columns[numeric_columns['Step']==round(min_steps*0.33)]['MSE'].reset_index(drop='True').rename('33')
         series_66 = numeric_columns[numeric_columns['Step']==round(min_steps*0.66)]['MSE'].reset_index(drop='True').rename('66')
         series_100 = numeric_columns[numeric_columns['Step']==round(min_steps*1)]['MSE'].reset_index(drop='True').rename('100')
@@ -438,11 +464,14 @@ if __name__ == '__main__':
     import time
     from Algorithms.LawnMower import LawnMowerAgent
     from Algorithms.NRRA import WanderingAgent
+    from Algorithms.PSO import ParticleSwarmOptimizationAgent
     from Algorithms.DRL.Agent.DuelingDQNAgent import MultiAgentDuelingDQNAgent
+    from Algorithms.DRL.ActionMasking.ActionMaskingUtils import ConsensusSafeActionMasking
 
     algorithms = [
-        # 'WanderingAgent', 
-        # 'LawnMower', 
+        'WanderingAgent', 
+        'LawnMower', 
+        'PSO', 
         # 'DoneTrainings/runs_2A/Alg_Network_RW_Influence_5_5/', 
         # 'DoneTrainings/runs_2A/Alg_Network_RW_Influence_10_0/', ##
         # 'DoneTrainings/runs_4A/Alg_Network_RW_Influence_5_5/',  
@@ -462,7 +491,21 @@ if __name__ == '__main__':
         # 'DoneTrainings/19_12_2023/Alg_Network_RW_x25xknowInfluence_10_0/',  ##
         # 'DoneTrainings/19_12_2023/Alg_Network_RW_x50xknowInfluence_10_0/',  ##
         # 'DoneTrainings/21_12_2023/Alg_Network_RW_x25ximprovInfluence_10_0/',  ##
-        'DoneTrainings/21_12_2023/Alg_Network_RW_x50ximprovInfluence_10_0/',  ##
+        # 'DoneTrainings/21_12_2023/Alg_Network_RW_x50ximprovInfluence_10_0/',  ##
+        # 'DoneTrainings/29_12_2023/Alg_Network_RW_x25xknowximprovInfluence_10_0/',  ##
+        # 'DoneTrainings/29_12_2023/Alg_Network_RW_x50xknowximprovInfluence_10_0/',  ##
+        # 'DoneTrainings/31_12_2023/Alg_Network_RW_x25xknowximprovInfluence_10_0/',  ##
+        # 'DoneTrainings/31_12_2023/Alg_Network_RW_x50xknowximprovInfluence_10_0/',  ##
+        # 'DoneTrainings/31_12_2023/Alg_Network_RW_x100xknowximprovInfluence_10_0/',  ##
+        # 'DoneTrainings/02_01_2024/Alg_Network_RW_x50xmmodelInfluence_10_0/',  ##
+        # 'DoneTrainings/02_01_2024/Alg_Network_RW_x100xmmodelInfluence_10_0/',  ##
+        # 'DoneTrainings/04_01_2024/Alg_Network_RW_x50xb0.5Influence_10_0/',  ##
+        # 'DoneTrainings/31_12_2023/Alg_Network_RW_x50xknowximprovInfluence_20_0/',  ##
+        # 'DoneTrainings/FINAL COMPARISONS/Obs1_RW_Influence_10_0_0/',  ##
+        # 'DoneTrainings/FINAL COMPARISONS/Obs1_RW_Influence_10_5_0/',  ##
+        # 'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_25/',  ##
+        # 'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_50/',  ##
+        'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_100/',  ##
         ]
 
     SHOW_FINAL_PLOT_GRAPHICS = False
@@ -486,7 +529,8 @@ if __name__ == '__main__':
 
 
 
-    STDs = [[np.array([0.005,0.005,0.005,0.005]), np.array([0.05,0.05,0.05,0.05]), np.array([0.5,0.5,0.5,0.5])], np.array([0.005,0.05,0.5,0.5]),  np.array([0.2013, 0.3893, 0.484, 0.2295]), np.array([0.0557, 0.0927, 0.0109, 0.1969])]
+    # STDs = [[np.array([0.005,0.005,0.005,0.005]), np.array([0.05,0.05,0.05,0.05]), np.array([0.5,0.5,0.5,0.5])], np.array([0.005,0.05,0.5,0.5]),  np.array([0.2013, 0.3893, 0.484, 0.2295]), np.array([0.0557, 0.0927, 0.0109, 0.1969])]
+    STDs = [[np.array([0.007,0.020,0.056,0.091]), np.array([0.213,0.381,0.130,0.197]), np.array([0.007,0.020,0.213,0.130])]]
     for STDs_SENSORS in STDs:
         if not isinstance(STDs_SENSORS, list):
             STDs_SENSORS = [STDs_SENSORS]
@@ -499,12 +543,13 @@ if __name__ == '__main__':
 
             for STD_SENSORS in STDs_SENSORS:
                 if len(STDs_SENSORS) > 1:
-                    EXTRA_NAME = f'{str(STD_SENSORS[-1])} {peaks_location} '
+                    # EXTRA_NAME = f'{str(STD_SENSORS[-1])} {peaks_location} '
+                    EXTRA_NAME = f'[{" ".join(map(str, STD_SENSORS))}] {peaks_location} '
                 elif len(STDs_SENSORS) == 1:
                     EXTRA_NAME = f'[{" ".join(map(str, STD_SENSORS))}] {peaks_location} '
                 for path_to_training_folder in algorithms:
 
-                    if path_to_training_folder == 'WanderingAgent' or path_to_training_folder == 'LawnMower':
+                    if path_to_training_folder in ['WanderingAgent', 'LawnMower', 'PSO']:
                         selected_algorithm = path_to_training_folder
 
                         # Set config #
@@ -514,15 +559,17 @@ if __name__ == '__main__':
                         mean_sensormeasure = np.array([0, 0, 0, 0])[:n_agents] # mean of the measure of every agent
                         std_sensormeasure = STD_SENSORS  # std of the measure of every agent
                         reward_function = 'Influence_area_changes_model' # Position_changes_model, Influence_area_changes_model, Error_with_model
+                        observation_function = 'knowledge' # uncertainty, knowledge
                         scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
-                        reward_weights=(10, 0)
+                        reward_weights=(10, 0, 100)
 
                         # Set initial positions #
                         random_initial_positions = True
                         if random_initial_positions:
                             initial_positions = 'fixed'
                         else:
-                            initial_positions = np.array([[46, 28], [46, 31], [49, 28], [49, 31]])[:n_agents, :]
+                            # initial_positions = np.array([[46, 28], [46, 31], [49, 28], [49, 31]])[:n_agents, :]
+                            initial_positions = np.array([[16, 6], [25, 25], [37, 14], [50, 32]])[:n_agents, :]
 
                         # Create environment # 
                         env = MultiAgentMonitoring(scenario_map=scenario_map,
@@ -538,6 +585,7 @@ if __name__ == '__main__':
                                                 flag_to_check_collisions_within=False,
                                                 max_collisions=1000,
                                                 reward_function=reward_function,
+                                                observation_function=observation_function,
                                                 ground_truth_type='shekel',
                                                 peaks_location=peaks_location,
                                                 dynamic=False,
@@ -549,9 +597,13 @@ if __name__ == '__main__':
                                                 )
                         
                         if selected_algorithm == "LawnMower":
-                            selected_algorithm_agents = [LawnMowerAgent(world=scenario_map, number_of_actions=8, movement_length=movement_length, forward_direction=0, seed=SEED) for _ in range(n_agents)]
+                            lawn_mower_rng = np.random.default_rng(seed=100)
+                            selected_algorithm_agents = [LawnMowerAgent(world=scenario_map, number_of_actions=8, movement_length=movement_length, forward_direction=int(lawn_mower_rng.uniform(0,8)), seed=SEED) for _ in range(n_agents)]
                         elif selected_algorithm == "WanderingAgent":
                             selected_algorithm_agents = [WanderingAgent(world=scenario_map, number_of_actions=8, movement_length=movement_length, seed=SEED) for _ in range(n_agents)]
+                        elif selected_algorithm == "PSO":
+                            selected_algorithm_agents = [ParticleSwarmOptimizationAgent(world=scenario_map, number_of_actions=8, movement_length=movement_length, seed=SEED) for _ in range(n_agents)]
+                            consensus_safe_masking_module = ConsensusSafeActionMasking(navigation_map = scenario_map, action_space_dim = env.n_actions, movement_length = env.movement_length)
 
                     else:
                         # Load env config #
@@ -577,6 +629,7 @@ if __name__ == '__main__':
                                             flag_to_check_collisions_within=env_config['flag_to_check_collisions_within'],
                                             max_collisions=env_config['max_collisions'],
                                             reward_function=reward_function,
+                                            observation_function=env_config['observation_function'],
                                             ground_truth_type=env_config['ground_truth_type'],
                                             peaks_location=peaks_location,
                                             dynamic=env_config['dynamic'],
@@ -621,7 +674,9 @@ if __name__ == '__main__':
                     if not(os.path.exists(relative_path)): # create the directory if not exists
                         os.mkdir(relative_path)
                         os.mkdir(f'{relative_path}/Paths')
+                        os.mkdir(f'{relative_path}/Paths_svg')
                         os.mkdir(f'{relative_path}/Models')
+                        os.mkdir(f'{relative_path}/Models_svg')
                     saving_paths.append(relative_path)
 
                     # algorithm_analizer = AlgorithmRecorderAndAnalizer(env, scenario_map, n_agents, relative_path, selected_algorithm, reward_function, reward_weights)
@@ -665,16 +720,20 @@ if __name__ == '__main__':
                         algorithm_analizer.save_registers(reset=True)
                         ground_truths_to_save.append(env.ground_truth.read())
                         
-                        if selected_algorithm == "LawnMower":
+                        if selected_algorithm in ['LawnMower', 'PSO']:
                             for i in range(n_agents):
-                                selected_algorithm_agents[i].reset(0)
+                                # selected_algorithm_agents[i].reset(0)
+                                selected_algorithm_agents[i].reset(int(lawn_mower_rng.uniform(0,8)) if selected_algorithm == 'LawnMower' else None)
 
                         # Take first actions #
                         if selected_algorithm == 'Network_With_SensorNoises' or selected_algorithm == 'Independent_Networks_By_Sensors_Type':
                             network.nogobackfleet_masking_module.reset()
                             actions = network.select_concensus_actions(states=states, sensor_error=env.std_sensormeasure, positions=env.get_active_agents_positions_dict(), n_actions=env.n_actions, done = done)
-                        else:
-                            actions = {i: selected_algorithm_agents[i].move(env.fleet.vehicles[i].actual_agent_position) for i in range(n_agents)}
+                        elif selected_algorithm  in ['WanderingAgent', 'LawnMower']:
+                            actions = {i: selected_algorithm_agents[i].move(env.fleet.vehicles[i].actual_agent_position) for i in env.get_active_agents_positions_dict().keys()}
+                        elif selected_algorithm == 'PSO':
+                            q_values = {i: selected_algorithm_agents[i].move(env.model_mean_map, env.model_uncertainty_map, env.new_measures, env.fleet.vehicles[i].distance_traveled, env.fleet.vehicles[i].actual_agent_position, env.position_new_measures) for i in env.get_active_agents_positions_dict().keys()}
+                            actions = consensus_safe_masking_module.query_actions(q_values=q_values, positions=env.get_active_agents_positions_dict())
 
                         while any([not value for value in done.values()]):  # while at least 1 active
                             
@@ -694,8 +753,11 @@ if __name__ == '__main__':
                             # Take new actions #
                             if selected_algorithm == 'Network_With_SensorNoises' or selected_algorithm == 'Independent_Networks_By_Sensors_Type':
                                 actions = network.select_concensus_actions(states=states, sensor_error=env.std_sensormeasure, positions=env.get_active_agents_positions_dict(), n_actions=env.n_actions, done = done)
-                            else:
-                                actions = {i: selected_algorithm_agents[i].move(env.fleet.vehicles[i].actual_agent_position) for i in range(n_agents)}
+                            elif selected_algorithm  in ['WanderingAgent', 'LawnMower']:
+                                actions = {i: selected_algorithm_agents[i].move(env.fleet.vehicles[i].actual_agent_position) for i in env.get_active_agents_positions_dict().keys()}
+                            elif selected_algorithm == 'PSO':
+                                q_values = {i: selected_algorithm_agents[i].move(env.model_mean_map, env.model_uncertainty_map, env.new_measures, env.fleet.vehicles[i].distance_traveled, env.fleet.vehicles[i].actual_agent_position, env.position_new_measures) for i in env.get_active_agents_positions_dict().keys()}
+                                actions = consensus_safe_masking_module.query_actions(q_values=q_values, positions=env.get_active_agents_positions_dict())
 
                             #print(env.gaussian_process.model.covar_module.base_kernel.lengthscale.item())
 

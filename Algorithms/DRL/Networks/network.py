@@ -79,23 +79,40 @@ class DuelingVisualNetwork(nn.Module):
 		self.out_dim = out_dim
 
 		# set common feature layer
+		# self.feature_layer = nn.Sequential(
+		# 	FeatureExtractor(in_dim, number_of_features),
+		# 	nn.Linear(number_of_features, 256),
+		# 	nn.ReLU(),
+		# 	nn.Linear(256, 256),
+		# 	nn.ReLU(),
+		# 	nn.Linear(256, 256),
+		# 	nn.ReLU(),
+		# )
+
+		# # set advantage layer
+		# self.advantage_hidden_layer = nn.Linear(256, 64)
+		# self.advantage_layer = nn.Linear(64, out_dim)
+
+		# # set value layer
+		# self.value_hidden_layer = nn.Linear(256, 64)
+		# self.value_layer = nn.Linear(64, 1)
 		self.feature_layer = nn.Sequential(
 			FeatureExtractor(in_dim, number_of_features),
-			nn.Linear(number_of_features, 256),
+			nn.Linear(number_of_features, 512),
 			nn.ReLU(),
-			nn.Linear(256, 256),
+			nn.Linear(512, 512),
 			nn.ReLU(),
-			nn.Linear(256, 256),
+			nn.Linear(512, 512),
 			nn.ReLU(),
 		)
 
 		# set advantage layer
-		self.advantage_hidden_layer = nn.Linear(256, 64)
-		self.advantage_layer = nn.Linear(64, out_dim)
+		self.advantage_hidden_layer = nn.Linear(512, 128)
+		self.advantage_layer = nn.Linear(128, out_dim)
 
 		# set value layer
-		self.value_hidden_layer = nn.Linear(256, 64)
-		self.value_layer = nn.Linear(64, 1)
+		self.value_hidden_layer = nn.Linear(512, 128)
+		self.value_layer = nn.Linear(128, 1)
 
 	def forward(self, x: torch.Tensor) -> torch.Tensor:
 		"""Forward method implementation."""

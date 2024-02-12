@@ -109,6 +109,7 @@ class GroundTruth(object):
         plt.title("Nº of peaks: {}".format(gt.number_of_peaks), color='black', fontsize=10)
         im = plt.plot(self.A[:, 0],
                       self.A[:, 1], 'hk', )
+        # plt.colorbar(plt.cm.ScalarMappable(cmap='cet_linear_bgy_10_95_c74')).set_label('Normalized WQP', color='black')
         plt.show()
 
     def step(self):

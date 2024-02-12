@@ -234,7 +234,8 @@ class MultiAgentMonitoring:
 				 influence_length = 2,
 				 flag_to_check_collisions_within = False,
 				 max_collisions = 5,
-				 reward_function = 'Influence_area_changes_model', 
+				 reward_function = 'Influence_area_changes_model',
+				 observation_function = 'uncertainty',
 				 ground_truth_type = 'algae_bloom', 
 				 peaks_location = 'Random', 
 				 dynamic = False, 
@@ -258,6 +259,7 @@ class MultiAgentMonitoring:
 		self.dynamic = dynamic
 		self.obstacles = obstacles
 		self.reward_function = reward_function
+		self.observation_function = observation_function
 		self.visitable_locations = np.vstack(np.where(self.scenario_map != 0)).T # coords of visitable cells
 		self.flag_to_check_collisions_within = flag_to_check_collisions_within
 
@@ -280,7 +282,6 @@ class MultiAgentMonitoring:
 		elif fleet_initial_positions == 'fixed': # Random choose between 4 fixed deployment positions #
 			self.random_inititial_positions = 'fixed'
 			self.deployment_positions = np.zeros_like(self.scenario_map)
-			self.deployment_positions[[46,46,49,49], [28,31,28,31]] = 1
 			self.initial_positions = np.argwhere(self.deployment_positions == 1)[self.rng_positions.choice(len(np.argwhere(self.deployment_positions == 1)), self.n_agents, replace=False)]
 		elif fleet_initial_positions == 'area': # Random deployment positions inside an area #
 			self.random_inititial_positions = 'area'
@@ -462,9 +463,11 @@ class MultiAgentMonitoring:
 		ground_truth = self.ground_truth.read() 
 
 		# Save positions where samples are taken #
-		position_measures = self.get_active_agents_positions_dict().values()
+		position_measures = [*self.get_active_agents_positions_dict().values()]
 
 		# Take the sample and add noise, saturating between 0 and 1 #
+		# self.noisy_measures_dict = {idx: np.clip(ground_truth[pose[0], pose[1]], 0,1) for idx, pose in self.get_active_agents_positions_dict().items()}
+		# noisy_measures = np.array([*self.noisy_measures_dict.values()])
 		noisy_measures = np.clip([ground_truth[pose[0], pose[1]] + np.random.normal(self.mean_sensormeasure[idx], self.std_sensormeasure[idx]) for idx, pose in self.get_active_agents_positions_dict().items()], 0, 1)
 
 		# Variance associated to the measures #
@@ -551,7 +554,8 @@ class MultiAgentMonitoring:
 		# fleet_position_map[self.fleet.fleet_positions[:,0], self.fleet.fleet_positions[:,1]] = 1.0 # set 1 where there is an agent
 		fleet_position_map_like_stds = np.zeros_like(self.scenario_map)
 		for agent_id, pose in self.get_active_agents_positions_dict().items():
-			fleet_position_map_like_stds[pose[0], pose[1]] = self.scaled_std_sensormeasure[agent_id] # set its scaled std where there is the agent
+			# fleet_position_map_like_stds[pose[0], pose[1]] = self.scaled_std_sensormeasure[agent_id] # set its scaled std where there is the agent
+			fleet_position_map_like_stds[pose[0], pose[1]] = 1 if self.sensors_type[agent_id] == 0 else 0.5 # teams acoruna
 
 		if self.colored_agents == True and self.activate_plot_graphics:
 			fleet_position_map_colored = np.zeros_like(self.scenario_map)
@@ -563,7 +567,9 @@ class MultiAgentMonitoring:
 			if active:
 				observing_agent_position = np.zeros_like(self.scenario_map)
 				# observing_agent_position[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = 1.0 # map only with the position of the observing agent
-				observing_agent_position[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = self.scaled_std_sensormeasure[agent_id] # map only with the position with its scaled std of the observing agent
+				# observing_agent_position[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = self.scaled_std_sensormeasure[agent_id] # map only with the position with its scaled std of the observing agent
+				observing_agent_position[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = 1 if self.sensors_type[agent_id] == 0 else 0.5 # teams acoruna
+
 				
 				# agent_observation_of_fleet = fleet_position_map.copy()
 				agent_observation_of_fleet = fleet_position_map_like_stds.copy()
@@ -571,11 +577,14 @@ class MultiAgentMonitoring:
 				agent_observation_of_fleet[agents_to_remove_positions[:,0], agents_to_remove_positions[:,1]] = 0.0 # agents map without the observing agent
 
 				"""Each key from states dictionary is an agent, all states associated to that agent are concatenated in its value:"""
+				if self.observation_function == 'uncertainty':
+					channel2 = self.model_uncertainty_map[np.newaxis] # Channel 2 -> Model uncertainty map
+				elif self.observation_function == 'knowledge':
+					channel2 = self.knowledge_map[np.newaxis] # Channel 2 -> Knowledge map with best scaled std
 				states[agent_id] = np.concatenate(( 
 					obstacle_map[np.newaxis], # Channel 0 -> Known boundaries/map
 					self.model_mean_map[np.newaxis], # Channel 1 -> Model mean map
-					self.model_uncertainty_map[np.newaxis], # Channel 2 -> Model uncertainty map
-					# self.knowledge_map[np.newaxis], # Channel 2 -> Knowledge map with best scaled std
+					channel2, # Channel 2 -> Model uncertainty map or Knowledge map
 					observing_agent_position[np.newaxis], # Channel 3 -> Observing agent position map
 					agent_observation_of_fleet[np.newaxis], # Channel 4 -> Others active agents position map
 				))
@@ -732,7 +741,7 @@ class MultiAgentMonitoring:
 			changes_in_model_mean = np.abs(self.model_mean_map - self.previous_model_mean_map)
 			changes_in_model_uncertainty = np.abs(self.model_uncertainty_map - self.previous_model_uncertainty_map)
 
-			ponderation_by_stds = True
+			ponderation_by_stds = False
 			if not ponderation_by_stds:
 				changes_mean = np.array(
 					[np.sum(
@@ -772,7 +781,7 @@ class MultiAgentMonitoring:
 			
 			extra_reward = np.zeros(self.n_agents)
 
-			ponderation_by_measure_importance = True
+			ponderation_by_measure_importance = False
 			if ponderation_by_measure_importance:
 				measures = self.new_measures.copy()
 				# measures = self.model_mean_map[np.array([*self.position_new_measures])[:,0], np.array([*self.position_new_measures])[:,1]]
@@ -804,18 +813,10 @@ class MultiAgentMonitoring:
 					# If the agent is better than a previous knowledge (improved measure)
 					condition = (1 - uncertainty_ponderation != 0) & ((1 - uncertainty_ponderation) < self.scaled_std_sensormeasure)
 					uncertainty_ponderation = np.where(condition, np.clip(0.25 + (self.scaled_std_sensormeasure - (1 - uncertainty_ponderation)), 0, 1), uncertainty_ponderation)
+					# uncertainty_ponderation = np.where(condition, 0.25 + (self.scaled_std_sensormeasure - (1 - uncertainty_ponderation)), uncertainty_ponderation)
 				
-				extra_reward += 50*measures*uncertainty_ponderation#*self.scaled_std_sensormeasure###
+				extra_reward += self.reward_weights[2]*measures*uncertainty_ponderation#*self.scaled_std_sensormeasure###
 			
-			# penalization_visited_areas = False
-			# if penalization_visited_areas:
-			# 	penalization = np.zeros(self.n_agents)
-			# 	for agent_id, pose in self.get_active_agents_positions_dict().items():
-			# 		area = self.visited_map[pose[0] - 1:pose[0] + 2, pose[1] - 1:pose[1] + 2]
-			# 		for x, y in np.argwhere((area !=0) & (area < self.std_sensormeasure[agent_id])):
-			# 			penalization[agent_id] += 1 - area[x, y] / self.std_sensormeasure[agent_id] # penalize more if std is lower
-			# 	extra_reward -= penalization
-
 			rewards = self.reward_weights[0] * changes_mean + self.reward_weights[1] * changes_uncertinty + extra_reward
 		
 		elif self.reward_function == 'Error_with_model':
@@ -935,6 +936,7 @@ class MultiAgentMonitoring:
 			'flag_to_check_collisions_within': self.flag_to_check_collisions_within,
 			'max_collisions': self.max_collisions,
 			'reward_function': self.reward_function,
+			'observation_function': self.observation_function,
 			'reward_weights': self.reward_weights,
 			'ground_truth_type': self.ground_truth_type,
 			'dynamic': self.dynamic,
@@ -954,6 +956,7 @@ if __name__ == '__main__':
 	seed = 24
 	np.random.seed(seed)
 	scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
+	scenario_map = np.genfromtxt('Environment/Maps/acoruna_port.csv', delimiter=',')
 	# scenario_map = np.genfromtxt('Environment/Maps/ypacarai_lake_58x41.csv', delimiter=',')
 
 	# Agents info #
@@ -965,6 +968,7 @@ if __name__ == '__main__':
 	mean_sensormeasure = np.array([0, 0, 0, 0])[:n_agents] # mean of the measure of every agent
 	range_std_sensormeasure = (1*0.5/100, 1*0.5*100/100) # AML is "the best", from then on 100 times worse
 	std_sensormeasure = np.array([0.05, 0.10, 0.20, 0.40])[:n_agents] # std of the measure of every agent
+	std_sensormeasure = np.array([0.025, 0.13, 0.025, 0.13])[:n_agents] # std of the measure of every agent
 	# std_sensormeasure = 'random'
 
 
@@ -973,8 +977,9 @@ if __name__ == '__main__':
 	if random_initial_positions:
 		initial_positions = 'fixed'
 	else:
-		# initial_positions = np.array([[30, 20], [40, 25], [40, 20], [30, 28]])[:n_agents, :]
-		initial_positions = np.array([[46, 28], [46, 31], [49, 28], [49, 31]])[:n_agents, :]
+		# initial_positions = np.array([[30, 20], [40, 25], [40, 20], [30, 28]])[:n_agents, :] # ypacarai lake
+		initial_positions = np.array([[7, 30], [7, 32], [7, 28], [7, 26]])[:n_agents, :] # a coruña port
+		# initial_positions = None
 
 	# Create environment # 
 	env = MultiAgentMonitoring(scenario_map = scenario_map,
@@ -990,12 +995,13 @@ if __name__ == '__main__':
 							   flag_to_check_collisions_within = True,
 							   max_collisions = 1000,
 							   reward_function = 'Influence_area_changes_model',  # Position_changes_model, Influence_area_changes_model, Error_with_model
+							   observation_function= 'uncertainty', # uncertainty, knowledge
 							   ground_truth_type = 'shekel',
 							   dynamic = False,
 							   obstacles = False,
 							   regression_library = 'gpytorch', # scikit, gpytorch
 							   scale_kernel  = True,
-							   reward_weights = (1.0, 0.1),
+							   reward_weights = (10, 5, 50),
 							   show_plot_graphics = True,
 							 )
 	
