@@ -471,7 +471,7 @@ if __name__ == '__main__':
     algorithms = [
         'WanderingAgent', 
         'LawnMower', 
-        'PSO', 
+        # 'PSO', 
         # 'DoneTrainings/runs_2A/Alg_Network_RW_Influence_5_5/', 
         # 'DoneTrainings/runs_2A/Alg_Network_RW_Influence_10_0/', ##
         # 'DoneTrainings/runs_4A/Alg_Network_RW_Influence_5_5/',  
@@ -505,7 +505,10 @@ if __name__ == '__main__':
         # 'DoneTrainings/FINAL COMPARISONS/Obs1_RW_Influence_10_5_0/',  ##
         # 'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_25/',  ##
         # 'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_50/',  ##
-        'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_100/',  ##
+        # 'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_100/',  ##
+        'DoneTrainings/AcorunaPort/Alg_Network_RW_Influence_10_10_0/',  ##
+        'DoneTrainings/AcorunaPort/Alg_Network_RW_Influence_20_5_0/',  ##
+        'DoneTrainings/AcorunaPort/Alg_Network_RW_Influence_25_10_0/',  ##
         ]
 
     SHOW_FINAL_PLOT_GRAPHICS = False
@@ -530,7 +533,8 @@ if __name__ == '__main__':
 
 
     # STDs = [[np.array([0.005,0.005,0.005,0.005]), np.array([0.05,0.05,0.05,0.05]), np.array([0.5,0.5,0.5,0.5])], np.array([0.005,0.05,0.5,0.5]),  np.array([0.2013, 0.3893, 0.484, 0.2295]), np.array([0.0557, 0.0927, 0.0109, 0.1969])]
-    STDs = [[np.array([0.007,0.020,0.056,0.091]), np.array([0.213,0.381,0.130,0.197]), np.array([0.007,0.020,0.213,0.130])]]
+    # STDs = [[np.array([0.007,0.020,0.056,0.091]), np.array([0.213,0.381,0.130,0.197]), np.array([0.007,0.020,0.213,0.130])]]
+    STDs = [[np.array([0.025,0.13,0.025,0.13])]] #coruna_port
     for STDs_SENSORS in STDs:
         if not isinstance(STDs_SENSORS, list):
             STDs_SENSORS = [STDs_SENSORS]
@@ -559,17 +563,20 @@ if __name__ == '__main__':
                         mean_sensormeasure = np.array([0, 0, 0, 0])[:n_agents] # mean of the measure of every agent
                         std_sensormeasure = STD_SENSORS  # std of the measure of every agent
                         reward_function = 'Influence_area_changes_model' # Position_changes_model, Influence_area_changes_model, Error_with_model
-                        observation_function = 'knowledge' # uncertainty, knowledge
-                        scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
+                        observation_function = 'uncertainty' # uncertainty, knowledge #coruna_port
+                        # scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
+                        scenario_map = np.genfromtxt('Environment/Maps/acoruna_port.csv', delimiter=',') #coruna_port
                         reward_weights=(10, 0, 100)
 
                         # Set initial positions #
-                        random_initial_positions = True
+                        random_initial_positions = False #coruna_port
                         if random_initial_positions:
                             initial_positions = 'fixed'
                         else:
                             # initial_positions = np.array([[46, 28], [46, 31], [49, 28], [49, 31]])[:n_agents, :]
-                            initial_positions = np.array([[16, 6], [25, 25], [37, 14], [50, 32]])[:n_agents, :]
+                            # initial_positions = np.array([[16, 6], [25, 25], [37, 14], [50, 32]])[:n_agents, :]
+                            initial_positions = np.array([[32, 7], [30, 7], [28, 7], [26, 7]])[:n_agents, :] #coruna_port
+
 
                         # Create environment # 
                         env = MultiAgentMonitoring(scenario_map=scenario_map,
@@ -600,9 +607,9 @@ if __name__ == '__main__':
                             lawn_mower_rng = np.random.default_rng(seed=100)
                             selected_algorithm_agents = [LawnMowerAgent(world=scenario_map, number_of_actions=8, movement_length=movement_length, forward_direction=int(lawn_mower_rng.uniform(0,8)), seed=SEED) for _ in range(n_agents)]
                         elif selected_algorithm == "WanderingAgent":
-                            selected_algorithm_agents = [WanderingAgent(world=scenario_map, number_of_actions=8, movement_length=movement_length, seed=SEED) for _ in range(n_agents)]
+                            selected_algorithm_agents = [WanderingAgent(world=scenario_map, number_of_actions=8, movement_length=movement_length, seed=SEED+i) for i in range(n_agents)]
                         elif selected_algorithm == "PSO":
-                            selected_algorithm_agents = [ParticleSwarmOptimizationAgent(world=scenario_map, number_of_actions=8, movement_length=movement_length, seed=SEED) for _ in range(n_agents)]
+                            selected_algorithm_agents = [ParticleSwarmOptimizationAgent(world=scenario_map, number_of_actions=8, movement_length=movement_length, seed=SEED+i) for i in range(n_agents)]
                             consensus_safe_masking_module = ConsensusSafeActionMasking(navigation_map = scenario_map, action_space_dim = env.n_actions, movement_length = env.movement_length)
 
                     else:
@@ -622,7 +629,7 @@ if __name__ == '__main__':
                                             mean_sensormeasure=np.array(env_config['mean_sensormeasure']),
                                             range_std_sensormeasure=range_std_sensormeasure, #tuple(env_config['range_std_sensormeasure']),
                                             std_sensormeasure= STD_SENSORS, #np.array(env_config['std_sensormeasure']),#
-                                            fleet_initial_positions=env_config['fleet_initial_positions'], #np.array(env_config['fleet_initial_positions']), #
+                                            fleet_initial_positions=np.array(env_config['fleet_initial_positions']), #env_config['fleet_initial_positions'], #
                                             seed=SEED,
                                             movement_length=env_config['movement_length'],
                                             influence_length=env_config['influence_length'],
@@ -653,7 +660,8 @@ if __name__ == '__main__':
                         elif not(network_with_sensornoises) and independent_networks_by_sensors_type:
                             selected_algorithm = "Independent_Networks_By_Sensors_Type"
                         else:
-                            raise NotImplementedError("This algorithm is not implemented. Choose one that is.")
+                            selected_algorithm = "Network"
+                            # raise NotImplementedError("This algorithm is not implemented. Choose one that is.")
 
                         network = MultiAgentDuelingDQNAgent(env=env,
                                                 memory_size=int(1E3),  #int(1E6), 1E5
@@ -726,7 +734,7 @@ if __name__ == '__main__':
                                 selected_algorithm_agents[i].reset(int(lawn_mower_rng.uniform(0,8)) if selected_algorithm == 'LawnMower' else None)
 
                         # Take first actions #
-                        if selected_algorithm == 'Network_With_SensorNoises' or selected_algorithm == 'Independent_Networks_By_Sensors_Type':
+                        if selected_algorithm  in ['Network_With_SensorNoises', 'Independent_Networks_By_Sensors_Type', 'Network']:
                             network.nogobackfleet_masking_module.reset()
                             actions = network.select_concensus_actions(states=states, sensor_error=env.std_sensormeasure, positions=env.get_active_agents_positions_dict(), n_actions=env.n_actions, done = done)
                         elif selected_algorithm  in ['WanderingAgent', 'LawnMower']:
@@ -751,7 +759,7 @@ if __name__ == '__main__':
                             algorithm_analizer.save_registers(new_reward, reset=False)
 
                             # Take new actions #
-                            if selected_algorithm == 'Network_With_SensorNoises' or selected_algorithm == 'Independent_Networks_By_Sensors_Type':
+                            if selected_algorithm  in ['Network_With_SensorNoises', 'Independent_Networks_By_Sensors_Type', 'Network']:
                                 actions = network.select_concensus_actions(states=states, sensor_error=env.std_sensormeasure, positions=env.get_active_agents_positions_dict(), n_actions=env.n_actions, done = done)
                             elif selected_algorithm  in ['WanderingAgent', 'LawnMower']:
                                 actions = {i: selected_algorithm_agents[i].move(env.fleet.vehicles[i].actual_agent_position) for i in env.get_active_agents_positions_dict().keys()}

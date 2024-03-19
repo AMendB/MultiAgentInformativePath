@@ -10,7 +10,7 @@ reward_function = 'Influence_area_changes_model' # Position_changes_model, Influ
 observation_function = 'uncertainty' # uncertainty, knowledge
 reward_weights = (10, 0, 0) #(1.0, 0.1)
 memory_size = int(1E6)
-network_type = 'network' # network_with_sensornoises, independent_networks_by_sensors_type
+network_type = 'network_with_sensornoises' # network, network_with_sensornoises, independent_networks_by_sensors_type
 device = 'cuda:0'
 episodes = 60000
 n_agents = 4  # max 4
@@ -29,24 +29,24 @@ movement_length = 2
 influence_length = 6
 mean_sensormeasure = np.array([0, 0, 0, 0])[:n_agents] # mean of the measure of every agent
 range_std_sensormeasure = (1*0.5/100, 1*0.5*100/100) # AML is "the best", from then on 100 times worse
-random_std = False #True
+random_std = True
 if random_std:
 	std_sensormeasure = 'random' # std of the measure of every agent
 else:
-	# std_sensormeasure = np.array([0.1, 0.25, 0.1, 0.25])[:n_agents] # std of the measure of every agent
-	std_sensormeasure = np.array([0.025, 0.13, 0.025, 0.13])[:n_agents] # std of the measure of every agent
+	std_sensormeasure = np.array([0.1, 0.25, 0.1, 0.25])[:n_agents] # std of the measure of every agent
+	# std_sensormeasure = np.array([0.025, 0.13, 0.025, 0.13])[:n_agents] # std of the measure of every agent (2 teams)
 
 
-# scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
-scenario_map = np.genfromtxt('Environment/Maps/acoruna_port.csv', delimiter=',')
+scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
+# scenario_map = np.genfromtxt('Environment/Maps/acoruna_port.csv', delimiter=',')
 
 # Set initial positions #
-random_initial_positions = False #True
+random_initial_positions = True 
 if random_initial_positions:
 	initial_positions = 'fixed'
 else:
-	# initial_positions = np.array([[46, 28], [46, 31], [49, 28], [49, 31]])[:n_agents, :]
-	initial_positions = np.array([[7, 30], [7, 32], [7, 28], [7, 26]])[:n_agents, :]
+	initial_positions = np.array([[46, 28], [46, 31], [49, 28], [49, 31]])[:n_agents, :] #ypacarai_map
+	# initial_positions = np.array([[32, 7], [30, 7], [28, 7], [26, 7]])[:n_agents, :] #coruna_port
 
 	
 # Create environment # 
@@ -80,7 +80,7 @@ if network_type == 'network_with_sensornoises':
 elif network_type == 'independent_networks_by_sensors_type':
 	network_with_sensornoises = False
 	independent_networks_by_sensors_type = True
-else:
+elif network_type == 'network':
 	network_with_sensornoises = False
 	independent_networks_by_sensors_type = False
 if memory_size == int(1E3):

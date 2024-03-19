@@ -282,6 +282,7 @@ class MultiAgentMonitoring:
 		elif fleet_initial_positions == 'fixed': # Random choose between 4 fixed deployment positions #
 			self.random_inititial_positions = 'fixed'
 			self.deployment_positions = np.zeros_like(self.scenario_map)
+			self.deployment_positions[[46,46,49,49], [28,31,28,31]] = 1
 			self.initial_positions = np.argwhere(self.deployment_positions == 1)[self.rng_positions.choice(len(np.argwhere(self.deployment_positions == 1)), self.n_agents, replace=False)]
 		elif fleet_initial_positions == 'area': # Random deployment positions inside an area #
 			self.random_inititial_positions = 'area'
@@ -435,6 +436,9 @@ class MultiAgentMonitoring:
 		self.dones_by_sensors_types = {type: False for type in range(self.n_sensors_type)}  
 		self.active_agents = {agent_id: True for agent_id in range(self.n_agents)}
 		self.n_active_agents = sum(self.active_agents.values())
+
+				# Map of knowledge #
+		self.knowledge_map = np.zeros_like(self.scenario_map)
 		
 		# Compute the redundancy mask after reset #
 		self.redundancy_mask = np.sum([agent.influence_mask for idx, agent in enumerate(self.fleet.vehicles) if self.active_agents[idx]], axis = 0)
@@ -978,7 +982,7 @@ if __name__ == '__main__':
 		initial_positions = 'fixed'
 	else:
 		# initial_positions = np.array([[30, 20], [40, 25], [40, 20], [30, 28]])[:n_agents, :] # ypacarai lake
-		initial_positions = np.array([[7, 30], [7, 32], [7, 28], [7, 26]])[:n_agents, :] # a coruña port
+		initial_positions = np.array([[32, 7], [30, 7], [28, 7], [26, 7]])[:n_agents, :] # a coruña port
 		# initial_positions = None
 
 	# Create environment # 

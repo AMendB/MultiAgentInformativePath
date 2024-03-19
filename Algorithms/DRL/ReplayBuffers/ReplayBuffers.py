@@ -130,6 +130,9 @@ class PrioritizedReplayBuffer(ReplayBuffer):
 			info: dict,
 	) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray, bool, dict]:
 		"""Store experience and priority."""
+		# Convert observations to uint16 to save memory
+		obs = np.uint16(obs*65535) 
+		next_obs = np.uint16(obs*65535)  
 		transition = super().store(obs, act, rew, next_obs, done, info)
 
 		if transition:
@@ -153,6 +156,10 @@ class PrioritizedReplayBuffer(ReplayBuffer):
 		done = self.done_buf[indices]
 		info = self.info_buf[indices]
 		weights = np.array([self._calculate_weight(i, beta) for i in indices])
+
+		# Reconverting observations to float64
+		obs = np.float64(obs/65535)
+		next_obs = np.float64(next_obs/65535)
 
 		return dict(
 			obs=obs,

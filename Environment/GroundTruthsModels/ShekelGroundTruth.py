@@ -3,6 +3,7 @@ import numpy as np
 from deap import benchmarks
 
 import sys
+import colorcet
 
 sys.path.append('.')
 
@@ -127,7 +128,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     ypacarai_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv',delimiter=',',dtype=float)
-    gt = GroundTruth(ypacarai_map, max_number_of_peaks=6, is_bounded=True, seed=10, peaks_location='MiddleRight')
+    gt = GroundTruth(ypacarai_map, max_number_of_peaks=6, is_bounded=True, seed=10, peaks_location='Random')
 
     # for i in range(100):
     #     gt.reset()
