@@ -7,8 +7,8 @@ import numpy as np
 
 # Selection of PARAMETERS TO TRAIN #
 reward_function = 'Influence_area_changes_model' # Position_changes_model, Influence_area_changes_model, Error_with_model
-observation_function = 'uncertainty' # uncertainty, knowledge
-reward_weights = (10, 0, 0) #(1.0, 0.1)
+observation_function = 'knowledge' # uncertainty, knowledge
+reward_weights = (10, 0, 100) #(1.0, 0.1)
 memory_size = int(1E6)
 network_type = 'network_with_sensornoises' # network, network_with_sensornoises, independent_networks_by_sensors_type
 device = 'cuda:0'
@@ -37,16 +37,16 @@ else:
 	# std_sensormeasure = np.array([0.025, 0.13, 0.025, 0.13])[:n_agents] # std of the measure of every agent (2 teams)
 
 
-scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
-# scenario_map = np.genfromtxt('Environment/Maps/acoruna_port.csv', delimiter=',')
+# scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
+scenario_map = np.genfromtxt('Environment/Maps/acoruna_port.csv', delimiter=',')
 
 # Set initial positions #
-random_initial_positions = True 
+random_initial_positions = False 
 if random_initial_positions:
 	initial_positions = 'fixed'
 else:
-	initial_positions = np.array([[46, 28], [46, 31], [49, 28], [49, 31]])[:n_agents, :] #ypacarai_map
-	# initial_positions = np.array([[32, 7], [30, 7], [28, 7], [26, 7]])[:n_agents, :] #coruna_port
+	# initial_positions = np.array([[46, 28], [46, 31], [49, 28], [49, 31]])[:n_agents, :] #ypacarai_map
+	initial_positions = np.array([[32, 7], [30, 7], [28, 7], [26, 7]])[:n_agents, :] #coruna_port
 
 	
 # Create environment # 

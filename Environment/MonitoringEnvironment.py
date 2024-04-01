@@ -558,8 +558,8 @@ class MultiAgentMonitoring:
 		# fleet_position_map[self.fleet.fleet_positions[:,0], self.fleet.fleet_positions[:,1]] = 1.0 # set 1 where there is an agent
 		fleet_position_map_like_stds = np.zeros_like(self.scenario_map)
 		for agent_id, pose in self.get_active_agents_positions_dict().items():
-			# fleet_position_map_like_stds[pose[0], pose[1]] = self.scaled_std_sensormeasure[agent_id] # set its scaled std where there is the agent
-			fleet_position_map_like_stds[pose[0], pose[1]] = 1 if self.sensors_type[agent_id] == 0 else 0.5 # teams acoruna
+			fleet_position_map_like_stds[pose[0], pose[1]] = self.scaled_std_sensormeasure[agent_id] # set its scaled std where there is the agent
+			# fleet_position_map_like_stds[pose[0], pose[1]] = 1 if self.sensors_type[agent_id] == 0 else 0.5 # teams acoruna
 
 		if self.colored_agents == True and self.activate_plot_graphics:
 			fleet_position_map_colored = np.zeros_like(self.scenario_map)
@@ -571,8 +571,8 @@ class MultiAgentMonitoring:
 			if active:
 				observing_agent_position = np.zeros_like(self.scenario_map)
 				# observing_agent_position[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = 1.0 # map only with the position of the observing agent
-				# observing_agent_position[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = self.scaled_std_sensormeasure[agent_id] # map only with the position with its scaled std of the observing agent
-				observing_agent_position[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = 1 if self.sensors_type[agent_id] == 0 else 0.5 # teams acoruna
+				observing_agent_position[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = self.scaled_std_sensormeasure[agent_id] # map only with the position with its scaled std of the observing agent
+				# observing_agent_position[self.fleet.fleet_positions[agent_id,0], self.fleet.fleet_positions[agent_id,1]] = 1 if self.sensors_type[agent_id] == 0 else 0.5 # teams acoruna
 
 				
 				# agent_observation_of_fleet = fleet_position_map.copy()
@@ -745,7 +745,7 @@ class MultiAgentMonitoring:
 			changes_in_model_mean = np.abs(self.model_mean_map - self.previous_model_mean_map)
 			changes_in_model_uncertainty = np.abs(self.model_uncertainty_map - self.previous_model_uncertainty_map)
 
-			ponderation_by_stds = False
+			ponderation_by_stds = True
 			if not ponderation_by_stds:
 				changes_mean = np.array(
 					[np.sum(
@@ -785,7 +785,7 @@ class MultiAgentMonitoring:
 			
 			extra_reward = np.zeros(self.n_agents)
 
-			ponderation_by_measure_importance = False
+			ponderation_by_measure_importance = True
 			if ponderation_by_measure_importance:
 				measures = self.new_measures.copy()
 				# measures = self.model_mean_map[np.array([*self.position_new_measures])[:,0], np.array([*self.position_new_measures])[:,1]]
