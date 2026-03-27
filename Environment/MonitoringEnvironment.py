@@ -961,6 +961,7 @@ if __name__ == '__main__':
 	np.random.seed(seed)
 	scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
 	scenario_map = np.genfromtxt('Environment/Maps/acoruna_port.csv', delimiter=',')
+	# scenario_map = np.genfromtxt('Environment/Maps/Alamillo30x49mask.csv', delimiter=' ')
 	# scenario_map = np.genfromtxt('Environment/Maps/ypacarai_lake_58x41.csv', delimiter=',')
 
 	# Agents info #
@@ -983,6 +984,7 @@ if __name__ == '__main__':
 	else:
 		# initial_positions = np.array([[30, 20], [40, 25], [40, 20], [30, 28]])[:n_agents, :] # ypacarai lake
 		initial_positions = np.array([[32, 7], [30, 7], [28, 7], [26, 7]])[:n_agents, :] # a coruña port
+		# initial_positions = np.array([[24, 3], [26, 3], [24, 5], [26, 5]])[:n_agents, :] # Alamillo30x49mask
 		# initial_positions = None
 
 	# Create environment # 
