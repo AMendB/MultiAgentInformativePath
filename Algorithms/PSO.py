@@ -64,21 +64,24 @@ class ParticleSwarmOptimizationAgent:
         self.vector_to_max_uncertainty = self.max_uncertainty_location - self.agents_positions[self.observing_agent_index]
         self.vector_to_max_mean = self.max_mean_location - self.agents_positions[self.observing_agent_index]
 
-        # Get final ponderated vector c*u #
+        # Get final ponderated vector (acceleration) c*u #
         self.u_values = np.random.uniform(0, 1, 4) # random ponderation values
-        self.vector = self.c_values[0] * self.u_values[0] * self.vector_to_best_local_location + \
+        self.acceleration = self.c_values[0] * self.u_values[0] * self.vector_to_best_local_location + \
                       self.c_values[1] * self.u_values[1] * self.vector_to_best_global_location + \
                       self.c_values[2] * self.u_values[2] * self.vector_to_max_uncertainty + \
                       self.c_values[3] * self.u_values[3] * self.vector_to_max_mean
         
-        self.velocities = self.velocities + self.vector
-        self.velocities = np.clip(self.velocities, -2, 2)
+        self.velocities = self.velocities + self.acceleration
 
-        # Normalize the vector #
+        # If final velocity norm is greater than 2, saturate the vector norm to 2 #
+        if np.linalg.norm(self.velocities) > 2:
+            self.velocities = 2 * self.velocities / np.linalg.norm(self.velocities)
+
+        # Normalize the vector to compare with discrete actions directions #
         self.final = self.velocities / np.linalg.norm(self.velocities)
 
         # Get the nearest valid action #
-        # for action in np.argsort(np.linalg.norm(self.actions_directions - self.vector, axis=1)):
+        # for action in np.argsort(np.linalg.norm(self.actions_directions - self.acceleration, axis=1)):
         #     new_position = self.agents_positions[self.observing_agent_index] + self.action_to_vector(action) * self.movement_length
         #     new_position = np.round(new_position).astype(int)
         #     if self.world[new_position[0], new_position[1]] == 1:
@@ -101,3 +104,4 @@ class ParticleSwarmOptimizationAgent:
         self.max_global_measure = 0
         self.best_local_location = None
         self.best_global_location = None
+        self.velocities = 0
