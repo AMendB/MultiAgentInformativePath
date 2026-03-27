@@ -471,7 +471,7 @@ if __name__ == '__main__':
     algorithms = [
         'WanderingAgent', 
         'LawnMower', 
-        # 'PSO', 
+        'PSO', 
         # 'DoneTrainings/runs_2A/Alg_Network_RW_Influence_5_5/', 
         # 'DoneTrainings/runs_2A/Alg_Network_RW_Influence_10_0/', ##
         # 'DoneTrainings/runs_4A/Alg_Network_RW_Influence_5_5/',  
@@ -506,9 +506,11 @@ if __name__ == '__main__':
         # 'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_25/',  ##
         # 'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_50/',  ##
         # 'DoneTrainings/FINAL COMPARISONS/Obs2_RW_Influence_10_0_100/',  ##
-        'DoneTrainings/AcorunaPort/Alg_Network_RW_Influence_10_10_0/',  ##
-        'DoneTrainings/AcorunaPort/Alg_Network_RW_Influence_20_5_0/',  ##
-        'DoneTrainings/AcorunaPort/Alg_Network_RW_Influence_25_10_0/',  ##
+        'DoneTrainings/REV1/Obs_Knowledge_RW_Influence_10_0_100/',  ##
+        # 'DoneTrainings/REV1/2Obs_Knowledge_RW_Influence_10_0_100/',  ##
+        # 'DoneTrainings/AcorunaPort/Alg_Network_RW_Influence_10_10_0/',  ##
+        # 'DoneTrainings/AcorunaPort/Alg_Network_RW_Influence_20_5_0/',  ##
+        # 'DoneTrainings/AcorunaPort/Alg_Network_RW_Influence_25_10_0/',  ##
         ]
 
     SHOW_FINAL_PLOT_GRAPHICS = False
@@ -534,7 +536,8 @@ if __name__ == '__main__':
 
     # STDs = [[np.array([0.005,0.005,0.005,0.005]), np.array([0.05,0.05,0.05,0.05]), np.array([0.5,0.5,0.5,0.5])], np.array([0.005,0.05,0.5,0.5]),  np.array([0.2013, 0.3893, 0.484, 0.2295]), np.array([0.0557, 0.0927, 0.0109, 0.1969])]
     # STDs = [[np.array([0.007,0.020,0.056,0.091]), np.array([0.213,0.381,0.130,0.197]), np.array([0.007,0.020,0.213,0.130])]]
-    STDs = [[np.array([0.025,0.13,0.025,0.13])]] #coruna_port
+    # STDs = [[np.array([0.025,0.13,0.025,0.13])]] #coruna_port
+    STDs = [[np.array([0.008,0.170,0.030,0.095])]] #coruna_port
     for STDs_SENSORS in STDs:
         if not isinstance(STDs_SENSORS, list):
             STDs_SENSORS = [STDs_SENSORS]
@@ -563,7 +566,7 @@ if __name__ == '__main__':
                         mean_sensormeasure = np.array([0, 0, 0, 0])[:n_agents] # mean of the measure of every agent
                         std_sensormeasure = STD_SENSORS  # std of the measure of every agent
                         reward_function = 'Influence_area_changes_model' # Position_changes_model, Influence_area_changes_model, Error_with_model
-                        observation_function = 'uncertainty' # uncertainty, knowledge #coruna_port
+                        observation_function = 'knowledge' # uncertainty, knowledge #coruna_port
                         # scenario_map = np.genfromtxt('Environment/Maps/ypacarai_map_low_res.csv', delimiter=',')
                         scenario_map = np.genfromtxt('Environment/Maps/acoruna_port.csv', delimiter=',') #coruna_port
                         reward_weights=(10, 0, 100)
