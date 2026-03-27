@@ -4,8 +4,8 @@ from sklearn.gaussian_process.kernels import RBF, ConstantKernel, Matern, WhiteK
 import torch
 import gpytorch
 
-from botorch.models.gp_regression import FixedNoiseGP 
-from botorch.fit import fit_gpytorch_mll
+# from botorch.models.gp_regression import FixedNoiseGP 
+# from botorch.fit import fit_gpytorch_mll
 
 import numpy as np
 
