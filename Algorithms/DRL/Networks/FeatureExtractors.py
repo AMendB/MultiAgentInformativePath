@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from gym.spaces import Box
 import numpy as np
 
 
