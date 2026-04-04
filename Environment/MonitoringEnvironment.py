@@ -871,12 +871,12 @@ class MultiAgentMonitoring:
 
 			return mean_absolute_error(self.get_gt_in_visitable_locations(), self.get_model_mu_in_visitable_locations())
 
-	def get_model_mu_mse_error(self, squared = False):
+	def get_model_mu_mse_error(self):
 			""" Returns the MSE error """
 
-			return mean_squared_error(self.get_gt_in_visitable_locations(), self.get_model_mu_in_visitable_locations(), squared = squared)
+			return mean_squared_error(self.get_gt_in_visitable_locations(), self.get_model_mu_in_visitable_locations())
 
-	def get_model_mu_mse_error_in_peaks(self, squared = False):
+	def get_model_mu_mse_error_in_peaks(self):
 			""" Returns the MSE error in peaks of the ground truth """
 
 			gt_in_visitable_locations = self.get_gt_in_visitable_locations()
@@ -887,9 +887,9 @@ class MultiAgentMonitoring:
 			gt_in_peaks = gt_in_visitable_locations[peaks_mask]
 			model_mu_in_peaks = model_mu_in_visitable_locations[peaks_mask]
 
-			return mean_squared_error(y_true=gt_in_peaks, y_pred=model_mu_in_peaks, sample_weight=gt_in_peaks, squared=squared)
+			return mean_squared_error(y_true=gt_in_peaks, y_pred=model_mu_in_peaks, sample_weight=gt_in_peaks)
 
-	def get_model_mu_mse_error_in_non_peaks(self, squared = False):
+	def get_model_mu_mse_error_in_non_peaks(self):
 			""" Returns the MSE error in non peaks of the ground truth """
 
 			gt_in_visitable_locations = self.get_gt_in_visitable_locations()
@@ -900,7 +900,7 @@ class MultiAgentMonitoring:
 			gt_in_non_peaks = gt_in_visitable_locations[non_peaks_mask]
 			model_mu_in_non_peaks = model_mu_in_visitable_locations[non_peaks_mask]
 
-			return mean_squared_error(y_true=gt_in_non_peaks, y_pred=model_mu_in_non_peaks, sample_weight=gt_in_non_peaks, squared=squared)
+			return mean_squared_error(y_true=gt_in_non_peaks, y_pred=model_mu_in_non_peaks, sample_weight=gt_in_non_peaks)
 
 	def get_model_mu_r2_error(self):
 			""" Returns the R2 error """
