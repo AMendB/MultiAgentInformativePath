@@ -829,13 +829,10 @@ class MultiAgentDuelingDQNAgent:
 						actions = {agent_id: action for agent_id, action in actions.items() if not done[agent_id]} # only active agents
 
 					# Process the agent step #
-					next_state, reward, done = self.step(actions)
+					states, reward, done = self.step(actions)
 
 					if render:
 						self.env.render()
-
-					# Update the state #
-					state = next_state
 					
 					reward_array = np.array([*reward.values()])
 
@@ -880,13 +877,10 @@ class MultiAgentDuelingDQNAgent:
 						actions = {agent_id: action for agent_id, action in actions.items() if not done[agent_id]} # only active agents
 
 					# Process the agent step #
-					next_state, reward, done = self.step(actions)
+					states, reward, done = self.step(actions)
 
 					if render:
 						self.env.render()
-
-					# Update the state #
-					state = next_state
 					
 					total_reward += np.sum(list(reward.values()))
 				
