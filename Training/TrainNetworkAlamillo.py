@@ -25,15 +25,15 @@ SHOW_PLOT_GRAPHICS = False
 seed = 0
 
 # Agents and sensors info #
-movement_length = 1
-influence_length = 6
+movement_length = 2
+influence_length = 3
 mean_sensormeasure = np.array([0, 0, 0, 0])[:n_agents] # mean of the measure of every agent
 range_std_sensormeasure = (1*0.5/100, 1*0.5*100/100) # AML is "the best", from then on 100 times worse
-random_std = True
+random_std = False
 if random_std:
 	std_sensormeasure = 'random' # std of the measure of every agent
 else:
-	std_sensormeasure = np.array([0.1, 0.25, 0.1, 0.25])[:n_agents] # std of the measure of every agent
+	std_sensormeasure = np.array([0.007,0.130])[:n_agents] # std of the measure of every agent
 	# std_sensormeasure = np.array([0.025, 0.13, 0.025, 0.13])[:n_agents] # std of the measure of every agent (2 teams)
 
 
