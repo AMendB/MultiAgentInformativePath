@@ -8,8 +8,13 @@ import numpy as np
 
 path_to_training_folder = 'DoneTrainings/runs_4A - Último (ponderado)/Alg_Network_RW_Influence_10_0/'
 
+# Load env config #
 f = open(path_to_training_folder + 'environment_config.json',)
 env_config = json.load(f)
+f.close()
+# Load exp config #
+f = open(path_to_training_folder + 'experiment_config.json',)
+exp_config = json.load(f)
 f.close()
 
 scenario_map = np.array(env_config['scenario_map'])
@@ -30,6 +35,7 @@ env = MultiAgentMonitoring(scenario_map=scenario_map,
 					flag_to_check_collisions_within=env_config['flag_to_check_collisions_within'],
 					max_collisions=env_config['max_collisions'],
 					reward_function=reward_function,
+					observation_function=env_config['observation_function'],
 					ground_truth_type=env_config['ground_truth_type'],
 					peaks_location='Random',
 					dynamic=env_config['dynamic'],
@@ -42,14 +48,15 @@ env = MultiAgentMonitoring(scenario_map=scenario_map,
 
 network = MultiAgentDuelingDQNAgent(env=env,
 						memory_size=int(1E3),  #int(1E6), 1E5
-						batch_size=64,
+						batch_size=exp_config['batch_size'],
 						target_update=1000,
 						seed = 3,
-						concensus_actions=True,
+						concensus_actions=exp_config['concensus_actions'],
 						device='cuda:0',
-						network_with_sensornoises = True,
-						independent_networks_by_sensors_type = False,
+						network_with_sensornoises = exp_config['network_with_sensornoises'],
+						independent_networks_by_sensors_type = exp_config['independent_networks_by_sensors_type'],
 						)
+network.epsilon = 0
 
 network.load_model(path_to_training_folder + 'BestPolicy.pth')
 
